@@ -1,15 +1,38 @@
 import Foundation
 
-// M1 vertical slice. Hardcoded everything. Proves end-to-end pipeline:
-//   scrape → parse → SVG → resvg → setDesktopImageURL
+// Entry point. Two modes today:
 //
-// CLI for now: `gh-wallpaper <username>` — overrides the hardcoded default.
-// Wave 3 (M5) replaces this entry point with a full subcommand dispatcher.
+//   1. `gh-wallpaper --daemon` — long-running daemon (Stream A; this PR).
+//      Reads events from system observers + adaptive timer, refreshes the
+//      wallpaper on change, never exits.
+//
+//   2. `gh-wallpaper [<username>]` — M1 vertical-slice spike: scrape, render,
+//      set wallpaper, then exit. This is the manual test path. Wave 3 will
+//      replace it with a full subcommand dispatcher.
 
 @main
-struct GhWallpaperSpike {
+struct GhWallpaperEntrypoint {
     static func main() async {
-        let username = CommandLine.arguments.dropFirst().first ?? "diegorico"
+        let args = Array(CommandLine.arguments.dropFirst())
+
+        if args.contains("--daemon") {
+            await runDaemon()
+            return
+        }
+
+        await runM1Spike(username: args.first { !$0.hasPrefix("-") } ?? "diegorico")
+    }
+
+    static func runDaemon() async {
+        let daemon = Daemon()
+        // Daemon.run() returns only on cancellation. The launchd KeepAlive
+        // policy will restart us if we ever exit; this should not happen in
+        // practice.
+        await daemon.run()
+        exit(0)
+    }
+
+    static func runM1Spike(username: String) async {
         let theme = Themes.githubDark
 
         do {
