@@ -91,7 +91,12 @@ jobs:
         run: |
           set -ex
           brew install --build-bottle local/dev/gh-wallpaper
-          brew bottle --root-url="$ROOT_URL" --json local/dev/gh-wallpaper
+          # `--no-rebuild` keeps rebuild=0 so the filename has no `.N.`
+          # suffix; without this, brew sometimes increments the rebuild
+          # counter based on prior local state, producing a file that
+          # mismatches what `pour_bottle_check` expects when rebuild
+          # differs across platforms.
+          brew bottle --no-rebuild --root-url="$ROOT_URL" --json local/dev/gh-wallpaper
 
           # `brew bottle` writes filenames with `--` between formula and version.
           # Homebrew constructs URLs from `root_url` with a single `-`, so the
@@ -118,7 +123,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: bottle-json-${{ matrix.os }}
-          path: '*.bottle.*.json'
+          # Match both `.bottle.json` (rebuild 0) and `.bottle.N.json` (rebuild N).
+          path: '*.bottle*.json'
           if-no-files-found: error
 
   summarize:

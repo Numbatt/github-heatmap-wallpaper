@@ -119,9 +119,11 @@ new = re.sub(
 pathlib.Path(formula_path).write_text(new)
 PY
 
-# 4. Sanity check
+# 4. Auto-fix Homebrew style (alignment of bottle digests, blank lines, etc.).
+#    `brew style --fix` is idempotent and safe; we run it before committing.
+brew style --fix "$FORMULA" >/dev/null 2>&1
 brew style "$FORMULA" || {
-    echo "error: brew style failed on the updated formula; aborting" >&2
+    echo "error: brew style still failing after --fix; aborting" >&2
     git checkout -- "$FORMULA"
     exit 1
 }
