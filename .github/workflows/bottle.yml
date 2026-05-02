@@ -91,8 +91,11 @@ jobs:
           # `brew bottle` writes filenames with `--` between formula and version.
           # Homebrew constructs URLs from `root_url` with a single `-`, so the
           # release asset name has to use single dash. Rename here.
-          for f in *--*.bottle.*.tar.gz; do
-            mv "$f" "$(echo "$f" | sed 's/--/-/')"
+          # Both `.bottle.tar.gz` (rebuild 0) and `.bottle.N.tar.gz` need to match,
+          # so use nullglob + a generic `*--*` pattern.
+          shopt -s nullglob
+          for f in *--*.tar.gz; do
+            mv "$f" "${f/--/-}"
           done
 
       - name: Upload bottle to release
@@ -101,7 +104,8 @@ jobs:
           TAG: ${{ steps.tag.outputs.tag }}
         run: |
           set -ex
-          for f in gh-wallpaper-*.bottle.*.tar.gz; do
+          shopt -s nullglob
+          for f in gh-wallpaper-*.bottle*.tar.gz; do
             gh release upload "$TAG" "$f" --clobber --repo "${{ github.repository }}"
           done
 
