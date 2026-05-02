@@ -122,7 +122,7 @@ public struct Wizard {
         }
 
         // Render + set per target display, then register launchd.
-        let targetDisplays = filter(displays: allDisplays, mode: config.displays, main: primary)
+        let targetDisplays = config.displays.filter(allDisplays)
         for display in targetDisplays {
             let canvas = SVGBuilder.Canvas(widthPx: display.widthPx, heightPx: display.heightPx)
             let svg = builder.build(calendar: calendar, theme: theme, canvas: canvas)
@@ -153,17 +153,6 @@ public struct Wizard {
         log: \(Paths.logFile.path)
         run `gh-wallpaper --help` for commands.
         """)
-    }
-
-    private func filter(displays: [DisplayInfo], mode: UserConfig.DisplayMode, main: DisplayInfo) -> [DisplayInfo] {
-        switch mode {
-        case .all: return displays
-        case .mainOnly: return [main]
-        case .custom(let uuids):
-            let set = Set(uuids)
-            let filtered = displays.filter { set.contains($0.uuid) }
-            return filtered.isEmpty ? displays : filtered
-        }
     }
 
     private func openInPreview(_ url: URL) {

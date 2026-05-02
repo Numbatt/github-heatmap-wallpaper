@@ -35,6 +35,28 @@ public struct UserConfig: Equatable, Codable, Sendable {
             }
             return .all  // unknown → safe default
         }
+
+        /// Returns the subset of `displays` that this mode targets. For
+        /// `.mainOnly`, picks the display flagged `isMain` (or the first
+        /// display as a fallback). For `.custom`, returns matches by UUID;
+        /// if no UUIDs match (e.g. the configured display is currently
+        /// disconnected), falls back to all so the user always sees *some*
+        /// wallpaper.
+        public func filter(_ displays: [DisplayInfo]) -> [DisplayInfo] {
+            switch self {
+            case .all:
+                return displays
+            case .mainOnly:
+                if let main = displays.first(where: { $0.isMain }) {
+                    return [main]
+                }
+                return displays.first.map { [$0] } ?? []
+            case .custom(let uuids):
+                let set = Set(uuids)
+                let matched = displays.filter { set.contains($0.uuid) }
+                return matched.isEmpty ? displays : matched
+            }
+        }
     }
 
     public init(

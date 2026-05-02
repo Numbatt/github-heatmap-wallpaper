@@ -2,19 +2,26 @@ import AppKit
 import CoreGraphics
 import Foundation
 
-/// One connected display. v0.1 only uses the main display (M1); Wave 3 wires
-/// per-display rendering.
+/// One connected display.
 public struct DisplayInfo: Equatable, Hashable, Sendable {
     public let displayID: CGDirectDisplayID
     public let uuid: String
     public let widthPx: Int
     public let heightPx: Int
+    public let isMain: Bool
 
-    public init(displayID: CGDirectDisplayID, uuid: String, widthPx: Int, heightPx: Int) {
+    public init(
+        displayID: CGDirectDisplayID,
+        uuid: String,
+        widthPx: Int,
+        heightPx: Int,
+        isMain: Bool = false
+    ) {
         self.displayID = displayID
         self.uuid = uuid
         self.widthPx = widthPx
         self.heightPx = heightPx
+        self.isMain = isMain
     }
 }
 
@@ -22,15 +29,16 @@ public enum DisplayEnumerator {
     /// Returns the main display's info at native pixel resolution.
     public static func main() -> DisplayInfo? {
         guard let screen = NSScreen.main else { return nil }
-        return info(for: screen)
+        return info(for: screen, mainID: CGMainDisplayID())
     }
 
-    /// All connected displays. Wave 3 will use this.
+    /// All connected displays.
     public static func all() -> [DisplayInfo] {
-        return NSScreen.screens.compactMap { info(for: $0) }
+        let mainID = CGMainDisplayID()
+        return NSScreen.screens.compactMap { info(for: $0, mainID: mainID) }
     }
 
-    private static func info(for screen: NSScreen) -> DisplayInfo? {
+    private static func info(for screen: NSScreen, mainID: CGDirectDisplayID) -> DisplayInfo? {
         guard let number = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber else {
             return nil
         }
@@ -39,7 +47,13 @@ public enum DisplayEnumerator {
         let widthPx = Int(screen.frame.width * scale)
         let heightPx = Int(screen.frame.height * scale)
         let uuid = displayUUID(for: displayID) ?? "display-\(displayID)"
-        return DisplayInfo(displayID: displayID, uuid: uuid, widthPx: widthPx, heightPx: heightPx)
+        return DisplayInfo(
+            displayID: displayID,
+            uuid: uuid,
+            widthPx: widthPx,
+            heightPx: heightPx,
+            isMain: displayID == mainID
+        )
     }
 
     private static func displayUUID(for id: CGDirectDisplayID) -> String? {

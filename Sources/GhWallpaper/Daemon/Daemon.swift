@@ -17,29 +17,22 @@ import Foundation
 /// the on-disk PNG is left untouched (last-good preserved).
 public actor Daemon {
 
+    /// Static runtime knobs. User-facing settings (username, theme, displays)
+    /// are not in here — those live in `UserConfig` on disk and are reloaded
+    /// every refresh tick so CLI commands like `gh-wallpaper theme paper`
+    /// take effect without a daemon restart.
     public struct Config: Sendable {
-        public var username: String
-        public var theme: Theme
         public var debounceInterval: TimeInterval     // seconds
         public var backoffSchedule: [TimeInterval]    // seconds, retried in order
 
         public init(
-            username: String,
-            theme: Theme,
             debounceInterval: TimeInterval = 30,
             backoffSchedule: [TimeInterval] = [1, 4, 16]
         ) {
-            self.username = username
-            self.theme = theme
             self.debounceInterval = debounceInterval
             self.backoffSchedule = backoffSchedule
         }
     }
-
-    public static let configPath: String = {
-        let home = NSHomeDirectory()
-        return "\(home)/Library/Application Support/gh-wallpaper/config.toml"
-    }()
 
     public static let defaultUsername = "diegorico"
 
@@ -75,8 +68,7 @@ public actor Daemon {
         self.observers = Observers()
         self.timer = AdaptiveTimer()
 
-        let username = Self.loadConfiguredUsername() ?? Self.defaultUsername
-        self.config = Config(username: username, theme: Themes.githubDark)
+        self.config = Config()
 
         if let err = rasterizerSetupError {
             self.logger.error("rasterizer unavailable at startup: \(err)")
@@ -85,7 +77,8 @@ public actor Daemon {
 
     /// Run the daemon forever. Returns only on cancellation.
     public func run() async {
-        logger.info("daemon starting (username=\(config.username) theme=\(config.theme.id))")
+        let initial = Self.loadUserConfig()
+        logger.info("daemon starting (username=\(initial.username) theme=\(initial.themeID))")
         logger.info(
             "power=\(timer.isOnAC ? "AC" : "battery") network=\(timer.isReachable ? "up" : "down")"
         )
@@ -174,9 +167,15 @@ public actor Daemon {
     /// failure tracker; success resets it. Never overwrites the on-disk PNG
     /// on failure.
     public func refresh() async {
-        // 1. Enumerate connected displays. v0.1 always renders to all displays;
-        //    a future config option can narrow this set.
-        let displays = DisplayEnumerator.all()
+        // 0. Reload the on-disk user config so theme/username/displays changes
+        //    propagate without a daemon restart. Falls back to a sensible
+        //    default if the config file is missing or unreadable.
+        let userConfig = Self.loadUserConfig()
+        let theme = userConfig.resolvedTheme()
+
+        // 1. Enumerate connected displays, then filter by `displays` mode.
+        let allDisplays = DisplayEnumerator.all()
+        let displays = userConfig.displays.filter(allDisplays)
         guard !displays.isEmpty else {
             logger.error("no displays detected; skipping refresh")
             failureTracker.recordFailure()
@@ -186,7 +185,7 @@ public actor Daemon {
         // 2. Fetch with exponential backoff inside this tick.
         let calendar: ContributionCalendar
         do {
-            calendar = try await fetchWithBackoff(username: config.username)
+            calendar = try await fetchWithBackoff(username: userConfig.username)
         } catch {
             let count = failureTracker.recordFailure()
             logger.warn("fetch failed (consecutive failures: \(count)): \(error)")
@@ -200,7 +199,7 @@ public actor Daemon {
         let appearance = Self.systemAppearance()
         let hash = combinedRenderHash(
             calendar: calendar,
-            theme: config.theme,
+            theme: theme,
             displays: displays,
             systemAppearance: appearance
         )
@@ -234,7 +233,7 @@ public actor Daemon {
         let stamp = String(Int(Date().timeIntervalSince1970 * 1000))
         for display in displays {
             let canvas = SVGBuilder.Canvas(widthPx: display.widthPx, heightPx: display.heightPx)
-            let svg = svgBuilder.build(calendar: calendar, theme: config.theme, canvas: canvas)
+            let svg = svgBuilder.build(calendar: calendar, theme: theme, canvas: canvas)
             let livePNG = outputDir.appendingPathComponent("wallpaper-\(display.uuid)-\(stamp).png")
             let tempPNG = outputDir.appendingPathComponent("wallpaper-\(display.uuid)-\(stamp).new.png")
 
@@ -381,32 +380,15 @@ public actor Daemon {
         return (style?.lowercased() == "dark") ? "dark" : "light"
     }
 
-    /// Reads `username = "..."` out of `~/Library/Application Support/gh-wallpaper/config.toml`
-    /// if it exists. Wave 3 replaces this with proper TOML parsing.
-    public static func loadConfiguredUsername() -> String? {
-        let path = configPath
-        guard FileManager.default.fileExists(atPath: path) else { return nil }
-        guard let data = try? Data(contentsOf: URL(fileURLWithPath: path)),
-              let contents = String(data: data, encoding: .utf8) else {
-            return nil
+    /// Reads the on-disk `UserConfig`, falling back to a default username when
+    /// the file is missing or unparseable. Called every refresh tick so CLI
+    /// commands that mutate config (e.g. `gh-wallpaper theme paper`) take
+    /// effect on the next tick without a daemon restart.
+    public static func loadUserConfig() -> UserConfig {
+        if let cfg = try? ConfigStore.read() {
+            return cfg
         }
-        for rawLine in contents.split(separator: "\n") {
-            let line = rawLine.trimmingCharacters(in: .whitespaces)
-            if line.hasPrefix("#") || line.isEmpty { continue }
-            // Match: username = "value"  (also tolerate single quotes / no quotes)
-            guard let eq = line.firstIndex(of: "=") else { continue }
-            let key = line[..<eq].trimmingCharacters(in: .whitespaces)
-            if key != "username" { continue }
-            var value = line[line.index(after: eq)...].trimmingCharacters(in: .whitespaces)
-            // Strip surrounding quotes.
-            if value.hasPrefix("\"") && value.hasSuffix("\"") && value.count >= 2 {
-                value = String(value.dropFirst().dropLast())
-            } else if value.hasPrefix("'") && value.hasSuffix("'") && value.count >= 2 {
-                value = String(value.dropFirst().dropLast())
-            }
-            if !value.isEmpty { return value }
-        }
-        return nil
+        return UserConfig(username: defaultUsername)
     }
 }
 

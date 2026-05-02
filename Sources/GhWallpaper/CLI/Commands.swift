@@ -74,6 +74,7 @@ public enum Commands {
         return await renderOneShot(
             username: config.username,
             theme: config.resolvedTheme(),
+            displaysMode: config.displays,
             setWallpaper: true
         )
     }
@@ -185,9 +186,14 @@ public enum Commands {
 
     // MARK: - Render helper
 
-    private static func renderOneShot(username: String, theme: Theme, setWallpaper: Bool) async -> Int32 {
+    private static func renderOneShot(
+        username: String,
+        theme: Theme,
+        displaysMode: UserConfig.DisplayMode = .all,
+        setWallpaper: Bool
+    ) async -> Int32 {
         do {
-            let displays = DisplayEnumerator.all()
+            let displays = displaysMode.filter(DisplayEnumerator.all())
             guard !displays.isEmpty else {
                 FileHandle.standardError.write(Data("no displays detected\n".utf8))
                 return 1
