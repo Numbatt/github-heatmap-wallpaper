@@ -8,6 +8,12 @@ class GhWallpaper < Formula
 
   head "https://github.com/Numbatt/github-heatmap-wallpaper.git", branch: "main"
 
+  bottle do
+    root_url "https://github.com/Numbatt/github-heatmap-wallpaper/releases/download/v0.1.0"
+    rebuild 1
+    sha256 cellar: :any_skip_relocation, arm64_tahoe: "e1c9fa3298f1af838aa112ebdd99197f16b55d76966dbe58485a0e0ab8dbe256"
+  end
+
   # No `depends_on xcode` — Homebrew enforces it as full Xcode.app, which
   # most macOS users don't have. The Swift toolchain that ships with Apple's
   # Command Line Tools (`xcode-select --install`) compiles this package fine.
