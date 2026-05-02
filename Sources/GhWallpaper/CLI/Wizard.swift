@@ -12,7 +12,7 @@ public struct Wizard {
 
         // Username
         let username: String = ask(
-            prompt: "GitHub username",
+            prompt: "GitHub username (the part after github.com/, e.g. torvalds)",
             defaultValue: existing?.username,
             validator: { (input: String) -> String? in
                 input.isEmpty ? "username required" : nil
