@@ -3,11 +3,7 @@ class GhWallpaper < Formula
   homepage "https://github.com/Numbatt/github-heatmap-wallpaper"
   url "https://github.com/Numbatt/github-heatmap-wallpaper/archive/refs/tags/v0.1.1.tar.gz"
   version "0.1.1"
-  # Placeholder sha — gets replaced by `script/update-bottle-block.sh v0.1.1`
-  # after the tag is pushed and the tarball exists. The bottle workflow
-  # self-heals around this in CI by patching at runtime; the tap copy
-  # gets the real value via the helper script.
-  sha256 "0000000000000000000000000000000000000000000000000000000000000000"
+  sha256 "5f6bbe2f4e943aae468ae4683d0b3c919f0f88be1adfe87786549faa789c26ff"
   license "MIT"
 
   head "https://github.com/Numbatt/github-heatmap-wallpaper.git", branch: "main"
