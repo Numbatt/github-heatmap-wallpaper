@@ -43,7 +43,18 @@ It'll ask for your GitHub username, theme, and which displays to use; preview th
 
 ## Themes
 
-Five themes ship:
+Four themes ship plus an `auto` mode that follows your macOS appearance setting:
+
+<table>
+  <tr>
+    <td align="center"><b>github-dark</b><br><img src="images/torvalds-github-dark.png" alt="github-dark theme — torvalds's contribution heatmap on graphite" /></td>
+    <td align="center"><b>github-light</b><br><img src="images/torvalds-github-light.png" alt="github-light theme — torvalds's contribution heatmap on white" /></td>
+  </tr>
+  <tr>
+    <td align="center"><b>paper</b><br><img src="images/torvalds-paper.png" alt="paper theme — torvalds's contribution heatmap in deep navy on cream" /></td>
+    <td align="center"><b>midnight</b><br><img src="images/torvalds-midnight.png" alt="midnight theme — torvalds's contribution heatmap on a blue-purple gradient" /></td>
+  </tr>
+</table>
 
 - `auto` — sync with system appearance (default; switches between `github-light` and `github-dark` based on macOS Light/Dark Mode).
 - `github-dark` — green-on-graphite.
