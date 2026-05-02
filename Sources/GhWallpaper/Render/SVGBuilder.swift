@@ -54,6 +54,11 @@ public struct SVGBuilder: Sendable {
         svg += "width=\"\(canvas.widthPx)\" height=\"\(canvas.heightPx)\" "
         svg += "viewBox=\"0 0 \(canvas.widthPx) \(canvas.heightPx)\">\n"
 
+        // Optional gradient defs (themes like `midnight` use this).
+        if let gradient = theme.gradientSVG {
+            svg += "  <defs>\n    \(gradient)\n  </defs>\n"
+        }
+
         // Background
         svg += #"  <rect x="0" y="0" width="100%" height="100%" fill="\#(theme.background)"/>"# + "\n"
 
