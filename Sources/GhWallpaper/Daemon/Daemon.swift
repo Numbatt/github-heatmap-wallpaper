@@ -34,8 +34,6 @@ public actor Daemon {
         }
     }
 
-    public static let defaultUsername = "diegorico"
-
     private let logger: Logger
     private let scraper: Scraper
     private let svgBuilder: SVGBuilder
@@ -77,8 +75,11 @@ public actor Daemon {
 
     /// Run the daemon forever. Returns only on cancellation.
     public func run() async {
-        let initial = Self.loadUserConfig()
-        logger.info("daemon starting (username=\(initial.username) theme=\(initial.themeID))")
+        if let initial = Self.loadUserConfig() {
+            logger.info("daemon starting (username=\(initial.username) theme=\(initial.themeID))")
+        } else {
+            logger.warn("daemon starting without a saved config; will retry each tick")
+        }
         logger.info(
             "power=\(timer.isOnAC ? "AC" : "battery") network=\(timer.isReachable ? "up" : "down")"
         )
@@ -168,9 +169,15 @@ public actor Daemon {
     /// on failure.
     public func refresh() async {
         // 0. Reload the on-disk user config so theme/username/displays changes
-        //    propagate without a daemon restart. Falls back to a sensible
-        //    default if the config file is missing or unreadable.
-        let userConfig = Self.loadUserConfig()
+        //    propagate without a daemon restart. If the config file is missing
+        //    or unreadable, log and skip — the daemon shouldn't pick a default
+        //    username, since rendering some other user's heatmap would be
+        //    misleading rather than helpful.
+        guard let userConfig = Self.loadUserConfig() else {
+            logger.error("no usable config at \(Paths.configFile.path); run `gh-wallpaper` to set up. skipping refresh.")
+            failureTracker.recordFailure()
+            return
+        }
         let theme = userConfig.resolvedTheme()
 
         // 1. Enumerate connected displays, then filter by `displays` mode.
@@ -380,15 +387,12 @@ public actor Daemon {
         return (style?.lowercased() == "dark") ? "dark" : "light"
     }
 
-    /// Reads the on-disk `UserConfig`, falling back to a default username when
-    /// the file is missing or unparseable. Called every refresh tick so CLI
-    /// commands that mutate config (e.g. `gh-wallpaper theme paper`) take
-    /// effect on the next tick without a daemon restart.
-    public static func loadUserConfig() -> UserConfig {
-        if let cfg = try? ConfigStore.read() {
-            return cfg
-        }
-        return UserConfig(username: defaultUsername)
+    /// Reads the on-disk `UserConfig`. Returns nil when the file is missing
+    /// or unparseable — callers must handle that explicitly rather than fall
+    /// back to a hardcoded username (rendering an arbitrary stranger's
+    /// heatmap silently is worse than failing visibly).
+    public static func loadUserConfig() -> UserConfig? {
+        return try? ConfigStore.read()
     }
 }
 

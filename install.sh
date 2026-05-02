@@ -6,7 +6,7 @@
 # Usage:  ./install.sh
 #
 # This is the source-install path documented in SPEC.md §4. The primary
-# install path is `brew install diegorico/tap/gh-wallpaper`; this script
+# install path is `brew install Numbatt/tap/gh-wallpaper`; this script
 # exists for contributors and source-readers who'd rather build locally.
 
 set -euo pipefail

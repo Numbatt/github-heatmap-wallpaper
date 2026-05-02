@@ -18,7 +18,7 @@ public enum ScraperError: Error, CustomStringConvertible {
 
 /// Fetches a user's contribution-graph HTML from github.com.
 public struct Scraper: Sendable {
-    public static let userAgent = "gh-wallpaper/0.1 (+https://github.com/diegorico/gh-wallpaper)"
+    public static let userAgent = "gh-wallpaper/0.1 (+https://github.com/Numbatt/github-heatmap-wallpaper)"
 
     private let session: URLSession
     private let parser: HTMLParser

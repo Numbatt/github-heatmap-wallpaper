@@ -26,10 +26,10 @@ public enum Paths {
 
     public static var launchdPlist: URL {
         URL(fileURLWithPath: NSHomeDirectory())
-            .appendingPathComponent("Library/LaunchAgents/dev.diegorico.gh-wallpaper.plist")
+            .appendingPathComponent("Library/LaunchAgents/dev.numbatt.gh-wallpaper.plist")
     }
 
-    public static let launchdLabel = "dev.diegorico.gh-wallpaper"
+    public static let launchdLabel = "dev.numbatt.gh-wallpaper"
 
     public static var logFile: URL {
         URL(fileURLWithPath: NSHomeDirectory())

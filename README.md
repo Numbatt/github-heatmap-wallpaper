@@ -11,8 +11,8 @@ Your GitHub contribution heatmap as your macOS desktop wallpaper. Refreshes itse
 ## Install
 
 ```sh
-git clone https://github.com/Numbatt/gh-wallpaper
-cd gh-wallpaper
+git clone https://github.com/Numbatt/github-heatmap-wallpaper
+cd github-heatmap-wallpaper
 ./install.sh
 ```
 
@@ -52,7 +52,7 @@ The wallpaper re-renders immediately and the new theme persists.
 
 ## How the background daemon works
 
-`gh-wallpaper` installs a per-user launchd agent (`~/Library/LaunchAgents/dev.Numbatt.gh-wallpaper.plist`) that runs `gh-wallpaper --daemon` and stays alive in the background.
+`gh-wallpaper` installs a per-user launchd agent (`~/Library/LaunchAgents/dev.numbatt.gh-wallpaper.plist`) that runs `gh-wallpaper --daemon` and stays alive in the background.
 
 **Adaptive polling:**
 - Every ~2 minutes on AC.

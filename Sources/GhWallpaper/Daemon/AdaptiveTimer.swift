@@ -18,8 +18,8 @@ public final class AdaptiveTimer: @unchecked Sendable {
     public static let batteryInterval: TimeInterval = 5 * 60
 
     private let monitor: NWPathMonitor
-    private let monitorQueue = DispatchQueue(label: "dev.diegorico.gh-wallpaper.adaptive-timer.monitor")
-    private let stateQueue = DispatchQueue(label: "dev.diegorico.gh-wallpaper.adaptive-timer.state")
+    private let monitorQueue = DispatchQueue(label: "dev.numbatt.gh-wallpaper.adaptive-timer.monitor")
+    private let stateQueue = DispatchQueue(label: "dev.numbatt.gh-wallpaper.adaptive-timer.state")
     private var _isReachable: Bool = true
     private var receivedFirstPathUpdate: Bool = false
     private var pendingWaiters: [CheckedContinuation<Void, Never>] = []

@@ -17,7 +17,7 @@ public final class FailureTracker: @unchecked Sendable {
     public static let notificationTitle = "gh-wallpaper"
     public static let notificationBody  = "can't refresh your heatmap. Run `gh-wallpaper diagnose` for details."
 
-    private let queue = DispatchQueue(label: "dev.diegorico.gh-wallpaper.failure-tracker")
+    private let queue = DispatchQueue(label: "dev.numbatt.gh-wallpaper.failure-tracker")
     private var _consecutiveFailures: Int = 0
     private var _hasNotified: Bool = false
 
@@ -88,7 +88,7 @@ public final class UNUserNotificationsNotifier: Notifier, @unchecked Sendable {
             content.sound = .default
             // nil trigger == deliver immediately.
             let request = UNNotificationRequest(
-                identifier: "dev.diegorico.gh-wallpaper.failure.\(UUID().uuidString)",
+                identifier: "dev.numbatt.gh-wallpaper.failure.\(UUID().uuidString)",
                 content: content,
                 trigger: nil
             )

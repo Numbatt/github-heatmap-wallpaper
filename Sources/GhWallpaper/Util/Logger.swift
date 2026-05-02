@@ -49,7 +49,7 @@ public final class Logger: @unchecked Sendable {
     /// CLI dispatch sets this to `.debug` when `-v`/`--verbose` is passed.
     public var consoleMirror: LogLevel?
 
-    private let queue = DispatchQueue(label: "dev.diegorico.gh-wallpaper.logger")
+    private let queue = DispatchQueue(label: "dev.numbatt.gh-wallpaper.logger")
     private var handle: FileHandle?
     private var bytesWritten: UInt64 = 0
     private let isoFormatter: ISO8601DateFormatter

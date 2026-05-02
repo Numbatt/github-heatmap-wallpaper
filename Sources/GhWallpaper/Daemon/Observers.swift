@@ -34,7 +34,7 @@ public final class Observers: @unchecked Sendable {
 
     private var workspaceWakeObserver: NSObjectProtocol?
     private let networkMonitor: NWPathMonitor
-    private let networkQueue = DispatchQueue(label: "dev.diegorico.gh-wallpaper.observers.network")
+    private let networkQueue = DispatchQueue(label: "dev.numbatt.gh-wallpaper.observers.network")
     private var lastNetworkSatisfied: Bool = true
     private var receivedFirstPathUpdate: Bool = false
 

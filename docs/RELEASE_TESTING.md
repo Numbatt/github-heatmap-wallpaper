@@ -15,7 +15,7 @@ This corresponds to the checklist in `SPEC.md` §17.
   setup wizard, the launchd registration, and the previous-wallpaper
   capture flow.
 - The release candidate available via the Homebrew tap
-  (`brew install diegorico/tap/gh-wallpaper`). For pre-tap dry-runs,
+  (`brew install Numbatt/tap/gh-wallpaper`). For pre-tap dry-runs,
   install the local formula: `brew install --HEAD ./Formula/gh-wallpaper.rb`.
 - A real, public GitHub username with at least a few visible
   contributions in the trailing year. Don't test with an empty profile —
@@ -27,7 +27,7 @@ This corresponds to the checklist in `SPEC.md` §17.
 ## Checklist
 
 - [ ] **1. Install via Homebrew on a clean account.** Run
-      `brew install diegorico/tap/gh-wallpaper` (or the local-formula
+      `brew install Numbatt/tap/gh-wallpaper` (or the local-formula
       equivalent). Verify `gh-wallpaper` is on `PATH` and launches
       without a Gatekeeper prompt or "this app is damaged" warning.
 - [ ] **2. Run the setup wizard with a real username.** Run
@@ -79,7 +79,7 @@ This corresponds to the checklist in `SPEC.md` §17.
       should be absent:
       - `~/Library/Application Support/gh-wallpaper/`
       - `~/Library/Logs/gh-wallpaper/`
-      - `~/Library/LaunchAgents/dev.diegorico.gh-wallpaper.plist`
+      - `~/Library/LaunchAgents/dev.numbatt.gh-wallpaper.plist`
       - The `gh-wallpaper` process should no longer appear in
         `launchctl list`.
 

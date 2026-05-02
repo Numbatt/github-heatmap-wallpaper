@@ -71,7 +71,7 @@ End-to-end "I pushed a commit and saw it land on my wallpaper" latency on AC: me
 
 | Path | Friction | Notes |
 | --- | --- | --- |
-| `brew install diegorico/tap/gh-wallpaper` | None — Homebrew downloads bypass the macOS quarantine flag, so the unsigned binary launches without Gatekeeper warnings | Primary recommended path. |
+| `brew install Numbatt/tap/gh-wallpaper` | None — Homebrew downloads bypass the macOS quarantine flag, so the unsigned binary launches without Gatekeeper warnings | Primary recommended path. |
 | `git clone && ./install.sh` | Requires Swift toolchain (Xcode CLT) — builds locally, no quarantine flag | For contributors and source-readers. |
 
 We do **not** ship a "download the binary from the website and double-click" path, because that would hit Gatekeeper's "this app is damaged" wall on an unsigned binary, and we don't want to either confuse users or document a `xattr` incantation as a normal step. If the project ever needs that path, we can revisit purchasing an Apple Developer ID ($99/yr) for signing + notarization.
@@ -352,7 +352,7 @@ Could not restore on:
 | `~/Library/Application Support/gh-wallpaper/config.toml` | Config (username, theme, displays config) |
 | `~/Library/Application Support/gh-wallpaper/state.json` | Runtime state (last refresh, last data hash, consecutive failures) |
 | `~/Library/Application Support/gh-wallpaper/previous-wallpapers.json` | Pre-install wallpaper map for restoration on uninstall |
-| `~/Library/LaunchAgents/dev.diegorico.gh-wallpaper.plist` | launchd agent (KeepAlive=true, RunAtLoad=true) |
+| `~/Library/LaunchAgents/dev.numbatt.gh-wallpaper.plist` | launchd agent (KeepAlive=true, RunAtLoad=true) |
 | `~/Library/Logs/gh-wallpaper/agent.log` | Rotating log (1 MB max, last 3 files retained) |
 
 `uninstall` removes all of the above and runs the wallpaper-restoration flow described in §14. There is no Keychain entry — we never use one, since there's no PAT.

@@ -62,9 +62,14 @@ public enum Commands {
             default: i += 1
             }
         }
-        let config = (try? ConfigStore.read()) ?? UserConfig(username: username ?? "diegorico")
-        let user = username ?? config.username
-        let theme = themeID.flatMap(Themes.byId) ?? config.resolvedTheme()
+        let config = try? ConfigStore.read()
+        guard let user = username ?? config?.username else {
+            FileHandle.standardError.write(Data(
+                "no GitHub username — pass `--user <name>` or run `gh-wallpaper` to set up.\n".utf8
+            ))
+            return 1
+        }
+        let theme = themeID.flatMap(Themes.byId) ?? config?.resolvedTheme() ?? Themes.githubDark
         return await renderOneShot(username: user, theme: theme, setWallpaper: false)
     }
 
@@ -94,7 +99,12 @@ public enum Commands {
             FileHandle.standardError.write(Data("unknown theme: \(id)\n".utf8))
             return 1
         }
-        var config = (try? ConfigStore.read()) ?? UserConfig(username: "diegorico")
+        guard var config = try? ConfigStore.read() else {
+            FileHandle.standardError.write(Data(
+                "no config; run `gh-wallpaper` to set up before switching themes.\n".utf8
+            ))
+            return 1
+        }
         config.themeID = id
         do {
             try ConfigStore.write(config)

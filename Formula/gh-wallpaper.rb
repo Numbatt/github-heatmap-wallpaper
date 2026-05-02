@@ -1,13 +1,13 @@
 class GhWallpaper < Formula
   desc "GitHub contribution heatmap as your macOS desktop wallpaper"
-  homepage "https://github.com/diegorico/gh-wallpaper"
+  homepage "https://github.com/Numbatt/github-heatmap-wallpaper"
   # TODO: before tagging v0.1, replace url + sha256 + version with the release tarball.
-  url "https://github.com/diegorico/gh-wallpaper/archive/refs/tags/v0.1.0.tar.gz"
+  url "https://github.com/Numbatt/github-heatmap-wallpaper/archive/refs/tags/v0.1.0.tar.gz"
   version "0.1.0"
   sha256 "0000000000000000000000000000000000000000000000000000000000000000"
   license "MIT"
 
-  head "https://github.com/diegorico/gh-wallpaper.git", branch: "main"
+  head "https://github.com/Numbatt/github-heatmap-wallpaper.git", branch: "main"
 
   depends_on xcode: ["15.0", :build]
   depends_on macos: :sonoma
@@ -19,9 +19,6 @@ class GhWallpaper < Formula
   end
 
   test do
-    # M1 wires `gh-wallpaper <username>` directly. Once Wave 3 lands
-    # the subcommand dispatcher, switch this to `--help`.
-    assert_path_exists bin/"gh-wallpaper"
-    assert_predicate bin/"gh-wallpaper", :executable?
+    assert_match "gh-wallpaper", shell_output("#{bin}/gh-wallpaper --help")
   end
 end
