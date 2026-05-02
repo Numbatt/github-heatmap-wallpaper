@@ -58,9 +58,25 @@ public enum LaunchAgent {
         }
         // Best-effort unload so bootstrap can re-load with the (possibly updated)
         // plist body. macOS returns assorted non-zero codes when the agent isn't
-        // already loaded — all expected, all ignored.
+        // already loaded — all expected, all ignored. The 200ms sleep gives the
+        // previous process time to fully exit; without it, bootstrap can race
+        // the teardown and return 5 ("input/output error") on Sequoia/Tahoe.
         _ = run("/bin/launchctl", "bootout", "gui/\(getuid())/\(Paths.launchdLabel)")
-        let status = run("/bin/launchctl", "bootstrap", "gui/\(getuid())", url.path)
+        Thread.sleep(forTimeInterval: 0.2)
+
+        var status = run("/bin/launchctl", "bootstrap", "gui/\(getuid())", url.path)
+        if status == 5 {
+            // Known race: bootout-then-bootstrap can return 5 even when the
+            // agent isn't holding any resources. One retry after a longer
+            // pause clears it in practice. If it still fails but the agent
+            // ends up loaded anyway (also possible — bootstrap is occasionally
+            // both noisy and successful), treat that as success.
+            Thread.sleep(forTimeInterval: 0.8)
+            status = run("/bin/launchctl", "bootstrap", "gui/\(getuid())", url.path)
+            if status == 0 || isLoaded {
+                return 0
+            }
+        }
         if status != 0 {
             throw LaunchAgentError.bootstrapFailed(status)
         }
