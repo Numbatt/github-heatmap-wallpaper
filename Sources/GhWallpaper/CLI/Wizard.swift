@@ -109,6 +109,15 @@ public struct Wizard {
             widthPx: primary.widthPx,
             heightPx: primary.heightPx
         )
+
+        print("""
+
+        Next: I'll open the rendered wallpaper in Preview so you can see what it'll
+        look like before applying it. Close the preview when you're done and come
+        back here to confirm.
+        """)
+        print("Press Enter to open the preview…", terminator: "")
+        _ = readLine()
         openInPreview(previewURL)
 
         let confirmed: Bool = askYesNo(
