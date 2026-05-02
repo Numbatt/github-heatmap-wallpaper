@@ -151,7 +151,7 @@ public struct Wizard {
         print("""
 
         all set. gh-wallpaper will refresh:
-          • every ~2 min on AC, ~5 min on battery
+          • every ~2 min when plugged in, ~5 min on battery
           • on wake, network reconnect, or display change
         log: \(Paths.logFile.path)
         run `gh-wallpaper --help` for commands.

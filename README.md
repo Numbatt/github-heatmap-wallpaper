@@ -77,9 +77,9 @@ The wallpaper re-renders immediately and the new theme persists.
 `gh-wallpaper` installs a per-user launchd agent (`~/Library/LaunchAgents/dev.numbatt.gh-wallpaper.plist`) that runs `gh-wallpaper --daemon` and stays alive in the background.
 
 **Adaptive polling:**
-- Every ~2 minutes on AC.
-- Every ~5 minutes on battery.
-- Paused entirely when offline; resumes on reconnect.
+- Every ~2 minutes when your Mac is plugged in.
+- Every ~5 minutes on battery (to save power).
+- Paused entirely when offline; resumes the moment your network comes back.
 
 **Instant triggers** (debounced to 30s):
 - Wake from sleep.
