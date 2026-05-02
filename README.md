@@ -43,13 +43,13 @@ It'll ask for your GitHub username, theme, and which displays to use; preview th
 
 ## Themes
 
-Four themes ship plus an `auto` mode that follows your macOS appearance:
+Five themes ship:
 
-- `github-dark` — green-on-graphite (default).
+- `auto` — sync with system appearance (default; switches between `github-light` and `github-dark` based on macOS Light/Dark Mode).
+- `github-dark` — green-on-graphite.
 - `github-light` — classic green-on-white.
-- `paper` — single-ink deep navy on textured off-white.
 - `midnight` — deep blue-purple gradient with a custom green ramp.
-- `auto` — switches between `github-light` and `github-dark` based on system appearance.
+- `paper` — single-ink deep navy on textured off-white.
 
 Switch any time:
 
@@ -107,8 +107,8 @@ If you want private contributions on the wallpaper, toggle GitHub's "Include pri
 ## Requirements
 
 - macOS 14 (Sonoma) or newer
-- [`resvg`](https://github.com/RazrFalcon/resvg) on your `PATH` (`brew install resvg`)
-- Swift 5.9+ if building from source
+- [`resvg`](https://github.com/RazrFalcon/resvg) on your `PATH` (`brew install resvg` — Homebrew installs this transitively)
+- If building from source: Swift 5.7+ (Apple's Command Line Tools are enough — `xcode-select --install`; no full Xcode required)
 
 ---
 

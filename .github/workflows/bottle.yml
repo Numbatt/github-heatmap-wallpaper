@@ -60,6 +60,26 @@ jobs:
             !in_block { print }
           ' Formula/gh-wallpaper.rb > "$TAP_DIR/Formula/gh-wallpaper.rb"
 
+      - name: Self-heal — patch sha256 to match released tarball
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          set -ex
+          # The source-repo formula's `sha256 "..."` may be the placeholder
+          # zeros from the version bump commit (we haven't yet computed the
+          # real sha because the tarball didn't exist before the tag was
+          # pushed). Compute the real sha here and patch the staged formula.
+          TAP_DIR="$(brew --repository)/Library/Taps/local/homebrew-dev"
+          SHA=$(curl -sL "https://github.com/${{ github.repository }}/archive/refs/tags/${TAG}.tar.gz" | shasum -a 256 | awk '{print $1}')
+          if [ "${#SHA}" -ne 64 ]; then
+            echo "could not fetch tarball sha for ${TAG}" >&2
+            exit 1
+          fi
+          # Replace the top-level `sha256 "..."` line (not the bottle block, which we already stripped).
+          ruby -i.bak -pe 'gsub(/^(\s*)sha256 "[0-9a-f]{64}"$/) { "#{$1}sha256 \"'"$SHA"'\"" }' "$TAP_DIR/Formula/gh-wallpaper.rb"
+          rm -f "$TAP_DIR/Formula/gh-wallpaper.rb.bak"
+          grep -E '^[[:space:]]*sha256 "' "$TAP_DIR/Formula/gh-wallpaper.rb"
+
       - name: Build + bottle
         env:
           ROOT_URL: https://github.com/${{ github.repository }}/releases/download/${{ steps.tag.outputs.tag }}

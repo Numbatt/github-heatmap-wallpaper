@@ -1,18 +1,16 @@
 class GhWallpaper < Formula
   desc "GitHub contribution heatmap as your macOS desktop wallpaper"
   homepage "https://github.com/Numbatt/github-heatmap-wallpaper"
-  url "https://github.com/Numbatt/github-heatmap-wallpaper/archive/refs/tags/v0.1.0.tar.gz"
-  version "0.1.0"
-  sha256 "9d5dc82adc35cc1011ce6ddf88163ce78d0abfa9e2a25d398ed36a82cd2fdaf2"
+  url "https://github.com/Numbatt/github-heatmap-wallpaper/archive/refs/tags/v0.1.1.tar.gz"
+  version "0.1.1"
+  # Placeholder sha — gets replaced by `script/update-bottle-block.sh v0.1.1`
+  # after the tag is pushed and the tarball exists. The bottle workflow
+  # self-heals around this in CI by patching at runtime; the tap copy
+  # gets the real value via the helper script.
+  sha256 "0000000000000000000000000000000000000000000000000000000000000000"
   license "MIT"
 
   head "https://github.com/Numbatt/github-heatmap-wallpaper.git", branch: "main"
-
-  bottle do
-    root_url "https://github.com/Numbatt/github-heatmap-wallpaper/releases/download/v0.1.0"
-    rebuild 1
-    sha256 cellar: :any_skip_relocation, arm64_tahoe: "e1c9fa3298f1af838aa112ebdd99197f16b55d76966dbe58485a0e0ab8dbe256"
-  end
 
   # No `depends_on xcode` — Homebrew enforces it as full Xcode.app, which
   # most macOS users don't have. The Swift toolchain that ships with Apple's
