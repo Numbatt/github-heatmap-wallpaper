@@ -57,16 +57,15 @@ public struct SVGBuilder: Sendable {
         // Background
         svg += #"  <rect x="0" y="0" width="100%" height="100%" fill="\#(theme.background)"/>"# + "\n"
 
-        // Headline (M1 placeholder: SVG <text> with system font; Stream B replaces this).
+        // Headline — hand-designed rectangle letterforms (Wave 2 Stream B).
         let headlineText = "DESIGN.  BUILD.  SHIP."
-        let headlineFontSize = headlineHeight * 0.75
-        svg += #"  <text x="\#(w / 2)" y="\#(headlineY + headlineHeight * 0.85)" "#
-        svg += #"font-family="-apple-system, BlinkMacSystemFont, Helvetica, sans-serif" "#
-        svg += #"font-size="\#(headlineFontSize)" font-weight="900" "#
-        svg += #"fill="\#(theme.headlineColor)" "#
-        svg += #"text-anchor="middle" letter-spacing="-2">"#
-        svg += headlineText
-        svg += "</text>\n"
+        svg += renderHeadline(
+            text: headlineText,
+            color: theme.headlineColor,
+            centerX: w / 2,
+            topY: headlineY,
+            targetHeight: headlineHeight
+        )
 
         // Heatmap cells
         let radius = layout.cells.first.map { $0.width * 0.25 } ?? 0
