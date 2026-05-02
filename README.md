@@ -11,14 +11,14 @@ Your GitHub contribution heatmap as your macOS desktop wallpaper. Refreshes itse
 ## Install
 
 ```sh
-git clone https://github.com/diegorico/gh-wallpaper
+git clone https://github.com/Numbatt/gh-wallpaper
 cd gh-wallpaper
 ./install.sh
 ```
 
 `install.sh` checks for the Swift toolchain and `resvg`, builds the release binary, and copies it into your Homebrew prefix (or `/usr/local/bin`).
 
-A public Homebrew tap (`brew install diegorico/tap/gh-wallpaper`) will land with v0.1.
+A public Homebrew tap (`brew install Numbatt/tap/gh-wallpaper`) will land with v0.1.
 
 Then run the wizard:
 
@@ -52,7 +52,7 @@ The wallpaper re-renders immediately and the new theme persists.
 
 ## How the background daemon works
 
-`gh-wallpaper` installs a per-user launchd agent (`~/Library/LaunchAgents/dev.diegorico.gh-wallpaper.plist`) that runs `gh-wallpaper --daemon` and stays alive in the background.
+`gh-wallpaper` installs a per-user launchd agent (`~/Library/LaunchAgents/dev.Numbatt.gh-wallpaper.plist`) that runs `gh-wallpaper --daemon` and stays alive in the background.
 
 **Adaptive polling:**
 - Every ~2 minutes on AC.
