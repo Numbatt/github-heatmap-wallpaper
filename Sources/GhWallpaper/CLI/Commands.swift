@@ -32,9 +32,8 @@ public enum Commands {
 
     private static func runWizard() async -> Int32 {
         do {
-            let config = try await Wizard().run()
-            print("\nrunning a one-time render to verify…")
-            return await runRefreshOnce(config: config)
+            _ = try await Wizard().run()
+            return 0
         } catch {
             FileHandle.standardError.write(Data("wizard failed: \(error)\n".utf8))
             return 1
@@ -102,15 +101,19 @@ public enum Commands {
 
     private static func runPause() -> Int32 {
         // Unload the launchd agent (gracefully — agent persists if reinstalled later).
-        return launchctl("bootout", "gui/\(getuid())/\(Paths.launchdLabel)")
+        return LaunchAgent.pause()
     }
 
     private static func runStart() -> Int32 {
-        guard FileManager.default.fileExists(atPath: Paths.launchdPlist.path) else {
-            FileHandle.standardError.write(Data("launchd plist not found at \(Paths.launchdPlist.path) — run `gh-wallpaper` to install it.\n".utf8))
+        // Always (re)install — this regenerates the plist with the current
+        // binary path and bootstraps. Idempotent.
+        do {
+            try LaunchAgent.install()
+            return 0
+        } catch {
+            FileHandle.standardError.write(Data("could not start daemon: \(error)\n".utf8))
             return 1
         }
-        return launchctl("bootstrap", "gui/\(getuid())", Paths.launchdPlist.path)
     }
 
     private static func runDisplays() -> Int32 {
@@ -158,11 +161,10 @@ public enum Commands {
     private static func runUninstall() -> Int32 {
         print("uninstalling gh-wallpaper…")
 
-        // 1. Unload launchd
-        _ = launchctl("bootout", "gui/\(getuid())/\(Paths.launchdLabel)")
-        try? FileManager.default.removeItem(at: Paths.launchdPlist)
+        // 1. Unload launchd + delete plist.
+        LaunchAgent.uninstall()
 
-        // 2. Restore previous wallpaper
+        // 2. Restore previous wallpaper.
         do {
             let cr = CaptureRestore()
             let results = try cr.restore()
@@ -174,7 +176,7 @@ public enum Commands {
             print("  (restore step had an issue: \(error) — continuing)")
         }
 
-        // 3. Remove support dir
+        // 3. Remove support dir.
         try? FileManager.default.removeItem(at: Paths.supportDir)
 
         print("✓ uninstalled.")
@@ -244,23 +246,6 @@ public enum Commands {
         let legacy = Paths.supportDir.appendingPathComponent("wallpaper-\(displayUUID).png")
         if FileManager.default.fileExists(atPath: legacy.path) && legacy != keep {
             try? fm.removeItem(at: legacy)
-        }
-    }
-
-    // MARK: - launchctl helper
-
-    @discardableResult
-    private static func launchctl(_ args: String...) -> Int32 {
-        let p = Process()
-        p.executableURL = URL(fileURLWithPath: "/bin/launchctl")
-        p.arguments = args
-        do {
-            try p.run()
-            p.waitUntilExit()
-            return p.terminationStatus
-        } catch {
-            FileHandle.standardError.write(Data("launchctl error: \(error)\n".utf8))
-            return 1
         }
     }
 
