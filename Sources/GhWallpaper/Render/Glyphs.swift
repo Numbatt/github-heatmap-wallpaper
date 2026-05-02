@@ -2,209 +2,232 @@ import Foundation
 
 /// Hand-designed rectangle-pixel letterforms for the headline `DESIGN.  BUILD.  SHIP.`
 ///
-/// Each glyph is a list of `(x, y, w, h)` rectangles laid out on a fixed 7-row grid.
-/// The glyph's column count is what `letterAdvance(for:)` returns — the Headline
-/// composer uses it to position the next letter.
+/// Each glyph is authored as an ASCII grid. `#` = filled cell, `.` (or space)
+/// = empty. Each line of the source string is one row of the glyph (top to
+/// bottom). The number of rows must equal `Glyphs.rows` (7). The number of
+/// columns is determined per-glyph by the longest line in that glyph's source.
 ///
-/// Visual model (matches `image-1.png`):
+/// ## Visual reference
 ///
-///   row 0       ▄▄▄▄▄        top bar
-///   row 1       █   █        upper-side rails (single-cell blocks)
-///   row 2       █   █        upper-side rails (second tier)
-///   row 3       ▄▄▄▄▄        middle bar
-///   row 4       █   █        lower-side rails
-///   row 5       █   █        lower-side rails (second tier)
-///   row 6       ▄▄▄▄▄        bottom bar
+/// Match `image-1.png` in the repo root. The reference uses segmented bars
+/// (visible breaks every few cells) rather than solid bars. To re-tune any
+/// letter, just edit its string below — the parser regenerates the rect data
+/// at the next build. No tooling required.
 ///
-/// Bars are 1 row tall; side rails are 1×1 blocks. Two stacked rails (rows 1+2 or
-/// rows 4+5) read as a "vertical stem" with a hairline gap — which is the
-/// segment-display look the spec calls for.
+/// ## Authoring tips
 ///
-/// Pure data — no logic in this file.
+/// - Keep all rows the same length (pad with `.`) — easier to read at a glance.
+/// - 9 columns ≈ the width that matches `image-1.png`. Narrower letters (`I`,
+///   `.`) can be fewer columns.
+/// - Adjacent `#` cells in the same row collapse into one wider rectangle at
+///   parse time, so `####` and `# ##` produce visually different output even
+///   if they fill the same total cells.
 enum Glyphs {
 
-    /// `(x, y, width, height)` rectangle on the 7-row glyph grid.
-    /// Coordinates are integers in grid columns/rows.
-    typealias Rect = (x: Int, y: Int, w: Int, h: Int)
+    public typealias Rect = (x: Int, y: Int, w: Int, h: Int)
 
     /// Glyph height in grid rows. Always 7.
-    static let rows: Int = 7
+    public static let rows: Int = 7
 
-    // MARK: - Letterforms (5 cols × 7 rows unless noted)
+    /// ASCII grid sources for each glyph. Edit these strings to redesign any
+    /// letter. Re-build to apply.
+    private static let sources: [Character: String] = [
 
-    /// `D` — full top + bottom bars, both side rails, NO middle bar.
-    /// (A middle bar would make this read as a `B`.)
-    static let D: [Rect] = [
-        // top bar
-        (0, 0, 5, 1),
-        // upper rails
-        (0, 1, 1, 1), (4, 1, 1, 1),
-        (0, 2, 1, 1), (4, 2, 1, 1),
-        // middle: rails only, no horizontal bar
-        (0, 3, 1, 1), (4, 3, 1, 1),
-        // lower rails
-        (0, 4, 1, 1), (4, 4, 1, 1),
-        (0, 5, 1, 1), (4, 5, 1, 1),
-        // bottom bar
-        (0, 6, 5, 1),
+        // D — segmented top/bottom bars, paired side rails.
+        "D": """
+        ###.###.#
+        ##.....##
+        ##.....##
+        #.......#
+        ##.....##
+        ##.....##
+        ###.###.#
+        """,
+
+        // E — three segmented horizontal bars, left rail only.
+        "E": """
+        ###.###.#
+        ##.......
+        ##.......
+        ###.##...
+        ##.......
+        ##.......
+        ###.###.#
+        """,
+
+        // S — segmented top, top-left rail, segmented middle, bottom-right
+        // rail, segmented bottom. Classic S diagonal.
+        "S": """
+        ###.###.#
+        ##.......
+        ##.......
+        ###.###.#
+        .......##
+        .......##
+        ###.###.#
+        """,
+
+        // I — narrow letter, segmented top + bottom, single-cell stem.
+        "I": """
+        ###
+        .#.
+        .#.
+        .#.
+        .#.
+        .#.
+        ###
+        """,
+
+        // G — like C with a horizontal tongue mid-right.
+        "G": """
+        ###.###.#
+        ##.......
+        ##.......
+        ##...###.
+        ##.....##
+        ##.....##
+        ###.###.#
+        """,
+
+        // N — both side rails full height; a diagonal stagger of mid blocks
+        // suggests the slanting stroke.
+        "N": """
+        ##.....##
+        ##.....##
+        ##.#...##
+        ##.#...##
+        ##...#.##
+        ##...#.##
+        ##.....##
+        """,
+
+        // B — segmented top, segmented middle, segmented bottom; both rails.
+        "B": """
+        ###.###..
+        ##.....##
+        ##.....##
+        ###.###..
+        ##.....##
+        ##.....##
+        ###.###..
+        """,
+
+        // U — both rails full height, segmented bottom only.
+        "U": """
+        ##.....##
+        ##.....##
+        ##.....##
+        ##.....##
+        ##.....##
+        ##.....##
+        ###.###.#
+        """,
+
+        // L — left rail only, segmented bottom.
+        "L": """
+        ##.......
+        ##.......
+        ##.......
+        ##.......
+        ##.......
+        ##.......
+        ###.###.#
+        """,
+
+        // H — both rails full height, segmented middle bar.
+        "H": """
+        ##.....##
+        ##.....##
+        ##.....##
+        ###.###.#
+        ##.....##
+        ##.....##
+        ##.....##
+        """,
+
+        // P — segmented top, both top rails, segmented mid, left rail bottom.
+        "P": """
+        ###.###..
+        ##.....##
+        ##.....##
+        ###.###..
+        ##.......
+        ##.......
+        ##.......
+        """,
+
+        // . (period) — small block on the baseline.
+        ".": """
+        .....
+        .....
+        .....
+        .....
+        .....
+        .....
+        ##...
+        """,
     ]
 
-    /// `E` — three bars, left rail only.
-    static let E: [Rect] = [
-        (0, 0, 5, 1),
-        (0, 1, 1, 1),
-        (0, 2, 1, 1),
-        (0, 3, 4, 1),
-        (0, 4, 1, 1),
-        (0, 5, 1, 1),
-        (0, 6, 5, 1),
-    ]
+    // MARK: - Public API
 
-    /// `S` — three bars, top-left rail, bottom-right rail.
-    static let S: [Rect] = [
-        (0, 0, 5, 1),
-        // top half: rail on left only
-        (0, 1, 1, 1),
-        (0, 2, 1, 1),
-        (0, 3, 5, 1),
-        // bottom half: rail on right only
-        (4, 4, 1, 1),
-        (4, 5, 1, 1),
-        (0, 6, 5, 1),
-    ]
-
-    /// `I` — narrow letter, three bars only, 3 cols wide.
-    static let I: [Rect] = [
-        (0, 0, 3, 1),
-        (1, 1, 1, 1),
-        (1, 2, 1, 1),
-        (0, 3, 3, 1),
-        (1, 4, 1, 1),
-        (1, 5, 1, 1),
-        (0, 6, 3, 1),
-    ]
-
-    /// `G` — like C but with an inward-poking middle-right block.
-    static let G: [Rect] = [
-        (0, 0, 5, 1),
-        (0, 1, 1, 1),
-        (0, 2, 1, 1),
-        // middle bar — only on the right half (the "G" tongue)
-        (2, 3, 3, 1),
-        (0, 4, 1, 1), (4, 4, 1, 1),
-        (0, 5, 1, 1), (4, 5, 1, 1),
-        (0, 6, 5, 1),
-    ]
-
-    /// `N` — both side rails full height; the diagonal is suggested by mid-row
-    /// blocks staggered between the rails.
-    static let N: [Rect] = [
-        // top: only the corner caps (left and right) — no top bar across the whole.
-        (0, 0, 2, 1), (3, 0, 2, 1),
-        // upper inner staircase
-        (0, 1, 1, 1), (4, 1, 1, 1),
-        (0, 2, 1, 1), (2, 2, 1, 1), (4, 2, 1, 1),
-        // mid: diagonal block in the middle
-        (0, 3, 1, 1), (2, 3, 1, 1), (4, 3, 1, 1),
-        // lower inner staircase
-        (0, 4, 1, 1), (2, 4, 1, 1), (4, 4, 1, 1),
-        (0, 5, 1, 1), (4, 5, 1, 1),
-        // bottom: corner caps
-        (0, 6, 2, 1), (3, 6, 2, 1),
-    ]
-
-    /// `.` (period) — small square block sitting on the baseline, wider than tall.
-    /// 2 cols wide.
-    static let PERIOD: [Rect] = [
-        (0, 5, 2, 1),
-        (0, 6, 2, 1),
-    ]
-
-    /// `B` — full top, full middle, full bottom bar; rails on left and right.
-    static let B: [Rect] = [
-        (0, 0, 5, 1),
-        (0, 1, 1, 1), (4, 1, 1, 1),
-        (0, 2, 1, 1), (4, 2, 1, 1),
-        (0, 3, 5, 1),
-        (0, 4, 1, 1), (4, 4, 1, 1),
-        (0, 5, 1, 1), (4, 5, 1, 1),
-        (0, 6, 5, 1),
-    ]
-
-    /// `U` — both side rails, no top bar, full bottom bar.
-    static let U: [Rect] = [
-        // No top bar
-        (0, 0, 1, 1), (4, 0, 1, 1),
-        (0, 1, 1, 1), (4, 1, 1, 1),
-        (0, 2, 1, 1), (4, 2, 1, 1),
-        (0, 3, 1, 1), (4, 3, 1, 1),
-        (0, 4, 1, 1), (4, 4, 1, 1),
-        (0, 5, 1, 1), (4, 5, 1, 1),
-        (0, 6, 5, 1),
-    ]
-
-    /// `L` — left rail full height, full bottom bar.
-    static let L: [Rect] = [
-        (0, 0, 1, 1),
-        (0, 1, 1, 1),
-        (0, 2, 1, 1),
-        (0, 3, 1, 1),
-        (0, 4, 1, 1),
-        (0, 5, 1, 1),
-        (0, 6, 5, 1),
-    ]
-
-    /// `H` — both side rails full height plus a middle bar.
-    static let H: [Rect] = [
-        (0, 0, 1, 1), (4, 0, 1, 1),
-        (0, 1, 1, 1), (4, 1, 1, 1),
-        (0, 2, 1, 1), (4, 2, 1, 1),
-        (0, 3, 5, 1),
-        (0, 4, 1, 1), (4, 4, 1, 1),
-        (0, 5, 1, 1), (4, 5, 1, 1),
-        (0, 6, 1, 1), (4, 6, 1, 1),
-    ]
-
-    /// `P` — top bar, both upper rails, middle bar, left lower rails only.
-    static let P: [Rect] = [
-        (0, 0, 5, 1),
-        (0, 1, 1, 1), (4, 1, 1, 1),
-        (0, 2, 1, 1), (4, 2, 1, 1),
-        (0, 3, 5, 1),
-        (0, 4, 1, 1),
-        (0, 5, 1, 1),
-        (0, 6, 1, 1),
-    ]
-
-    // MARK: - Lookup
-
-    /// Returns the glyph rectangles for a given character, or `nil` if undefined.
-    static func glyph(for char: Character) -> [Rect]? {
-        switch char {
-        case "D": return D
-        case "E": return E
-        case "S": return S
-        case "I": return I
-        case "G": return G
-        case "N": return N
-        case "B": return B
-        case "U": return U
-        case "L": return L
-        case "H": return H
-        case "P": return P
-        case ".": return PERIOD
-        default:  return nil
-        }
+    /// Returns the rect data for a character, or nil if unsupported.
+    public static func glyph(for ch: Character) -> [Rect]? {
+        if let cached = cache[ch] { return cached }
+        guard let src = sources[ch] else { return nil }
+        let rects = parse(source: src)
+        cache[ch] = rects
+        return rects
     }
 
-    /// Returns the glyph's advance width (in grid columns) for the composer's
-    /// horizontal cursor. Includes the glyph's own width but no inter-letter gap.
-    static func letterAdvance(for char: Character) -> Int {
-        switch char {
-        case "I": return 3
-        case ".": return 2
-        case " ": return 0   // word space handled by the composer, not here
-        default:  return 5
+    /// Returns the column-advance (width in grid columns) for a character.
+    /// Used by the headline composer to position subsequent letters.
+    public static func letterAdvance(for ch: Character) -> Int {
+        if let cached = advanceCache[ch] { return cached }
+        guard let src = sources[ch] else { return 0 }
+        var maxLen = 0
+        var current = 0
+        for c in src {
+            if c == "\n" {
+                maxLen = max(maxLen, current)
+                current = 0
+            } else {
+                current += 1
+            }
         }
+        maxLen = max(maxLen, current)
+        advanceCache[ch] = maxLen
+        return maxLen
     }
+
+    // MARK: - Parser
+
+    /// Converts an ASCII grid source into a coalesced list of rectangles.
+    /// Adjacent `#` cells in the same row are merged into a single wider
+    /// rectangle (so a `####` row becomes one rect, not four). Vertical
+    /// merging is intentionally NOT done — the segment-display aesthetic
+    /// depends on visible row boundaries.
+    private static func parse(source: String) -> [Rect] {
+        var rects: [Rect] = []
+        let lines = source.split(separator: "\n", omittingEmptySubsequences: false)
+        for (rowIdx, line) in lines.enumerated() {
+            let chars = Array(line)
+            var col = 0
+            while col < chars.count {
+                if chars[col] == "#" {
+                    var run = 1
+                    while col + run < chars.count && chars[col + run] == "#" {
+                        run += 1
+                    }
+                    rects.append((x: col, y: rowIdx, w: run, h: 1))
+                    col += run
+                } else {
+                    col += 1
+                }
+            }
+        }
+        return rects
+    }
+
+    private static var cache: [Character: [Rect]] = [:]
+    private static var advanceCache: [Character: Int] = [:]
 }
