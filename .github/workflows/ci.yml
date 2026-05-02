@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-test:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache .build
+        uses: actions/cache@v4
+        with:
+          path: .build
+          key: ${{ runner.os }}-spm-${{ hashFiles('**/Package.swift') }}
+          restore-keys: ${{ runner.os }}-spm-
+
+      - name: Install resvg
+        run: brew install resvg
+
+      - name: Swift toolchain
+        run: swift --version
+
+      - name: Build
+        run: swift build --warnings-as-errors
+
+      - name: Test
+        run: swift test

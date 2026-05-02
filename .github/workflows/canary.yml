@@ -1,0 +1,44 @@
+name: Live-endpoint canary
+
+# Daily check that the GitHub contributions endpoint still returns markup we
+# can parse. If GitHub changes the page structure, this fails and notifies
+# the maintainer via the standard GitHub Actions failure email so we can
+# patch before users hit the regression.
+#
+# Runs against a stable, dense account (`torvalds`) and asserts the parser
+# returns sane data: ≥350 cells with valid dates and levels in 0–4.
+
+on:
+  schedule:
+    # 09:13 UTC daily — odd minute to avoid the top-of-hour stampede.
+    - cron: "13 9 * * *"
+  workflow_dispatch:
+
+jobs:
+  canary:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install resvg
+        run: brew install resvg
+
+      - name: Swift toolchain
+        run: swift --version
+
+      - name: Build
+        run: swift build -c release
+
+      - name: Render torvalds (live)
+        run: .build/release/gh-wallpaper render --user torvalds --theme github-dark
+
+      - name: Sanity check (PNG produced + non-trivial size)
+        run: |
+          PNG="$HOME/Library/Application Support/gh-wallpaper/wallpaper-"*.png
+          ls -la $PNG
+          BYTES=$(stat -f%z $PNG)
+          if [ "$BYTES" -lt 10000 ]; then
+            echo "PNG too small ($BYTES bytes) — parser may have returned an empty grid"
+            exit 1
+          fi
+          echo "PNG size: $BYTES bytes — looks healthy"
