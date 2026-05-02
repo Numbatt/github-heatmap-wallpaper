@@ -152,6 +152,18 @@ else
     sudo cp "${BINARY_SRC}" "${DEST}"
 fi
 
+# Re-sign ad-hoc after the copy. macOS Sequoia/Tahoe attaches a
+# `com.apple.provenance` xattr to copied binaries; combined with the
+# linker-emitted ad-hoc signature, amfid will SIGKILL the process at
+# launch ("zsh: killed gh-wallpaper") on first run. Re-signing in place
+# generates a fresh ad-hoc signature that satisfies amfi's checks.
+# Idempotent and a no-op if nothing's wrong.
+if [ -w "${DEST}" ]; then
+    codesign --force --sign - "${DEST}" 2>/dev/null || true
+else
+    sudo codesign --force --sign - "${DEST}" 2>/dev/null || true
+fi
+
 # ---------------------------------------------------------------------------
 # Done
 # ---------------------------------------------------------------------------
@@ -163,12 +175,12 @@ ${DIM}Next steps:${RESET}
 
   Run:
 
-      gh-wallpaper <your-github-username>
+      gh-wallpaper
 
-  to render your contribution heatmap and set it as your wallpaper.
+  to walk through the setup wizard. It'll ask for your GitHub username,
+  theme, and which displays to use, preview the result, set the
+  wallpaper, and register a background daemon that keeps it in sync.
 
-  (Wave 3 will replace this single-shot command with a full setup
-  wizard: \`gh-wallpaper\` with no args. Until then, re-run the command
-  whenever you want a refresh.)
+  See ${BOLD}gh-wallpaper --help${RESET} for the full subcommand list.
 
 EOF

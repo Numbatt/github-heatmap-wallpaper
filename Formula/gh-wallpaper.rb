@@ -16,6 +16,12 @@ class GhWallpaper < Formula
   def install
     system "swift", "build", "--disable-sandbox", "-c", "release"
     bin.install ".build/release/gh-wallpaper"
+    # Re-sign ad-hoc in place. macOS Sequoia/Tahoe attaches a
+    # `com.apple.provenance` xattr to copied binaries which, combined
+    # with the linker-emitted ad-hoc signature, makes amfid SIGKILL the
+    # process on first launch. A fresh `codesign --sign -` after the
+    # copy generates a valid ad-hoc signature that amfi accepts.
+    system "codesign", "--force", "--sign", "-", bin/"gh-wallpaper"
   end
 
   test do
