@@ -11,14 +11,27 @@ Your GitHub contribution heatmap as your macOS desktop wallpaper. Refreshes itse
 ## Install
 
 ```sh
+brew install Numbatt/tap/gh-wallpaper
+```
+
+That's it. Or, equivalently:
+
+```sh
+brew tap Numbatt/tap
+brew install gh-wallpaper
+```
+
+### From source
+
+If you'd rather build locally (e.g. you don't use Homebrew):
+
+```sh
 git clone https://github.com/Numbatt/github-heatmap-wallpaper
 cd github-heatmap-wallpaper
 ./install.sh
 ```
 
 `install.sh` checks for the Swift toolchain and `resvg`, builds the release binary, and copies it into your Homebrew prefix (or `/usr/local/bin`).
-
-A public Homebrew tap (`brew install Numbatt/tap/gh-wallpaper`) will land with v0.1.
 
 Then run the wizard:
 
