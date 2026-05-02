@@ -32,34 +32,18 @@ public struct HeatmapLayout {
         centerX: Double,
         topY: Double
     ) {
-        // GitHub's heatmap is 53 columns × 7 rows max. We always lay out 53×7 cells;
-        // those that fall outside the day range render at level -1 (transparent).
-        let columns = 53
+        // GitHub returns exactly 53 weeks × 7 days = 371 cells, ordered Sun→Sat
+        // chronologically (the parser sorts by ISO date ascending). We lay them
+        // out directly in column-major order: days[0] at (col=0, row=0),
+        // days[1] at (col=0, row=1), ..., days[7] at (col=1, row=0), etc.
+        //
+        // No date arithmetic. No timezone-sensitive Calendar operations. The
+        // weekday of each cell is determined purely by its index, which avoids
+        // a class of off-by-one bugs that depended on the user's local TZ vs
+        // the UTC midnight Date the parser produced from "YYYY-MM-DD" strings.
         let rows = 7
+        let columns = max(1, Int((Double(days.count) / Double(rows)).rounded(.up)))
 
-        // Determine the date of the cell at column 0, row 0 (a Sunday).
-        // It is the Sunday on or before the first contribution day.
-        let calendar = Calendar(identifier: .gregorian)
-        let startDate: Date
-        if let first = days.first?.date {
-            // Find the Sunday of that week. GitHub uses Sunday-start weeks.
-            let weekday = calendar.component(.weekday, from: first)  // 1 = Sunday
-            let daysBack = weekday - 1
-            startDate = calendar.date(byAdding: .day, value: -daysBack, to: first) ?? first
-        } else {
-            startDate = Date()
-        }
-
-        // Build a date -> level lookup for fast access.
-        var levelByDate: [String: Int] = [:]
-        let f = ISO8601DateFormatter()
-        f.formatOptions = [.withFullDate]
-        for day in days {
-            levelByDate[day.isoDate] = day.level
-        }
-
-        // Cell sizing: targetWidth = columns * cell + (columns - 1) * gap.
-        // Gap is 25% of cell width.
         let cellWidth = targetWidth / (Double(columns) + Double(columns - 1) * 0.25)
         let gap = cellWidth * 0.25
         let cellHeight = cellWidth
@@ -72,21 +56,13 @@ public struct HeatmapLayout {
         var cells: [Cell] = []
         cells.reserveCapacity(columns * rows)
 
-        for col in 0..<columns {
-            for row in 0..<rows {
-                let dayIdx = col * rows + row
-                guard let date = calendar.date(
-                    byAdding: .day,
-                    value: dayIdx,
-                    to: startDate
-                ) else { continue }
-                let iso = f.string(from: date)
-                let level = levelByDate[iso] ?? -1   // -1 = not in window, render transparent
-
-                let x = originX + Double(col) * (cellWidth + gap)
-                let y = originY + Double(row) * (cellHeight + gap)
-                cells.append(Cell(x: x, y: y, width: cellWidth, height: cellHeight, level: level))
-            }
+        for (i, day) in days.enumerated() {
+            let col = i / rows
+            let row = i % rows
+            guard col < columns else { break }
+            let x = originX + Double(col) * (cellWidth + gap)
+            let y = originY + Double(row) * (cellHeight + gap)
+            cells.append(Cell(x: x, y: y, width: cellWidth, height: cellHeight, level: day.level))
         }
 
         self.cells = cells
