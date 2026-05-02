@@ -125,4 +125,4 @@ If you want private contributions on the wallpaper, toggle GitHub's "Include pri
 
 ## Design notes
 
-Architecture, scope, and tradeoffs live in [`SPEC.md`](SPEC.md). License: MIT.
+Architecture, scope, and tradeoffs live in [`SPEC.md`](SPEC.md). Licensed under [MIT](LICENSE).
