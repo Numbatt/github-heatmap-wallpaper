@@ -23,9 +23,9 @@ public enum DaemonEvent: Sendable, Equatable {
     }
 }
 
-/// Registers all the system observers Stream A cares about and exposes them
-/// as a single AsyncStream<DaemonEvent>. Hold the Observers instance alive for
-/// the lifetime of the daemon — when it deallocates, the underlying observer
+/// Registers the daemon's wake/network/display observers and exposes them as a
+/// single AsyncStream<DaemonEvent>. Hold the Observers instance alive for the
+/// lifetime of the daemon — when it deallocates, the underlying observer
 /// registrations are torn down.
 public final class Observers: @unchecked Sendable {
 

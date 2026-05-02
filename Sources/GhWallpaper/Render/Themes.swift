@@ -1,10 +1,6 @@
 import Foundation
 
 /// A theme defines all colors used in a wallpaper render.
-///
-/// FROZEN INTERFACE — Wave 2 Stream C populates the full set; M1 ships only
-/// `githubDark`. The struct shape itself does not change, except for one
-/// optional addition: `gradientSVG` (defaults to nil) for gradient backgrounds.
 public struct Theme: Equatable, Hashable, Codable, Sendable {
     public let id: String                  // "github-light" | "github-dark" | "paper" | "midnight"
     public let background: String          // CSS color string, e.g. "#0d1117"
@@ -35,7 +31,6 @@ public struct Theme: Equatable, Hashable, Codable, Sendable {
 }
 
 public enum Themes {
-    /// Ships in M1. Wave 2 Stream C will add the others + auto-resolver.
     public static let githubDark = Theme(
         id: "github-dark",
         background: "#0d1117",

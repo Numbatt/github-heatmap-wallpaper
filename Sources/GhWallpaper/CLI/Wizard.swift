@@ -33,13 +33,13 @@ public struct Wizard {
             }
         )
 
-        // Displays
-        let displaysRaw: String = ask(
-            prompt: "Displays (all, main, or 'custom:UUID1,UUID2')",
-            defaultValue: existing?.displays.serialized ?? "all",
-            validator: { _ in nil }
+        // Displays — numbered picker. The user can type "all", "main",
+        // or comma-separated indices ("1", "1,3").
+        let detected = DisplayEnumerator.all()
+        let displays = pickDisplays(
+            from: detected,
+            existing: existing?.displays
         )
-        let displays = UserConfig.DisplayMode.parse(displaysRaw)
 
         let config = UserConfig(
             username: username,
@@ -153,6 +153,66 @@ public struct Wizard {
         log: \(Paths.logFile.path)
         run `gh-wallpaper --help` for commands.
         """)
+    }
+
+    /// Renders a numbered list of detected displays and prompts the user to
+    /// pick `all`, `main`, a single index, or a comma-separated set of
+    /// indices. Falls back to `.all` when nothing is detected.
+    private func pickDisplays(
+        from detected: [DisplayInfo],
+        existing: UserConfig.DisplayMode?
+    ) -> UserConfig.DisplayMode {
+        guard !detected.isEmpty else { return .all }
+        print("\nDetected displays:")
+        for (i, d) in detected.enumerated() {
+            let mainTag = d.isMain ? "  (main)" : ""
+            print("  \(i + 1)) \(d.uuid)  \(d.widthPx)×\(d.heightPx)\(mainTag)")
+        }
+        let defaultDisplay = displayDefault(for: existing, available: detected)
+        while true {
+            print("Apply to (all / main / 1 / 1,2) [\(defaultDisplay)]: ", terminator: "")
+            let raw = (readLine() ?? "").trimmingCharacters(in: .whitespaces)
+            let input = raw.isEmpty ? defaultDisplay : raw
+            switch input.lowercased() {
+            case "all": return .all
+            case "main": return .mainOnly
+            default:
+                let parts = input.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+                let indices = parts.compactMap { Int($0) }
+                guard !indices.isEmpty, indices.count == parts.count else {
+                    print("  → please enter `all`, `main`, or numbers like `1` or `1,2`")
+                    continue
+                }
+                let validRange = 1...detected.count
+                guard indices.allSatisfy({ validRange.contains($0) }) else {
+                    print("  → indices must be in 1...\(detected.count)")
+                    continue
+                }
+                let uuids = indices.map { detected[$0 - 1].uuid }
+                if uuids.count == detected.count { return .all }
+                return .custom(uuids: uuids)
+            }
+        }
+    }
+
+    /// Picks a sensible default for the display prompt: `all` for fresh
+    /// installs, the existing serialized form when re-running the wizard,
+    /// rewritten as comma-separated indices when those existing UUIDs map
+    /// onto the currently-detected display set.
+    private func displayDefault(
+        for existing: UserConfig.DisplayMode?,
+        available: [DisplayInfo]
+    ) -> String {
+        guard let existing else { return "all" }
+        switch existing {
+        case .all: return "all"
+        case .mainOnly: return "main"
+        case .custom(let uuids):
+            let indices = uuids.compactMap { uuid in
+                available.firstIndex(where: { $0.uuid == uuid }).map { $0 + 1 }
+            }
+            return indices.isEmpty ? "all" : indices.map(String.init).joined(separator: ",")
+        }
     }
 
     private func openInPreview(_ url: URL) {

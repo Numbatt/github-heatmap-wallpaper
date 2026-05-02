@@ -45,6 +45,9 @@ public final class Logger: @unchecked Sendable {
     public let maxBytes: Int
     public let keepCount: Int
     public var minLevel: LogLevel
+    /// When non-nil, log lines at >= this level are also written to stderr.
+    /// CLI dispatch sets this to `.debug` when `-v`/`--verbose` is passed.
+    public var consoleMirror: LogLevel?
 
     private let queue = DispatchQueue(label: "dev.diegorico.gh-wallpaper.logger")
     private var handle: FileHandle?
@@ -56,13 +59,15 @@ public final class Logger: @unchecked Sendable {
         logFileName: String = "agent.log",
         maxBytes: Int = 1_000_000,    // 1 MB
         keepCount: Int = 3,
-        minLevel: LogLevel = .debug
+        minLevel: LogLevel = .debug,
+        consoleMirror: LogLevel? = nil
     ) {
         self.directory = directory
         self.logFileName = logFileName
         self.maxBytes = maxBytes
         self.keepCount = keepCount
         self.minLevel = minLevel
+        self.consoleMirror = consoleMirror
         let f = ISO8601DateFormatter()
         f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         self.isoFormatter = f
@@ -97,6 +102,9 @@ public final class Logger: @unchecked Sendable {
         let timestamp = isoFormatter.string(from: Date())
         let lineStr = "\(timestamp) [\(level.label)] \(message)\n"
         guard let data = lineStr.data(using: .utf8) else { return }
+        if let mirror = consoleMirror, level >= mirror {
+            FileHandle.standardError.write(data)
+        }
         queue.async { [weak self] in
             self?.write(data)
         }

@@ -1,7 +1,7 @@
 import AppKit
 import Foundation
 
-/// Stream D — capture & restore the user's previous wallpaper.
+/// Capture & restore the user's previous wallpaper.
 ///
 /// On first activation we snapshot whatever wallpaper each display is currently
 /// showing, and on uninstall we put it back. Static image files (e.g.

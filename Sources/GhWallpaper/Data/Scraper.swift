@@ -17,9 +17,6 @@ public enum ScraperError: Error, CustomStringConvertible {
 }
 
 /// Fetches a user's contribution-graph HTML from github.com.
-///
-/// FROZEN INTERFACE — Wave 2 streams call `Scraper.fetch(username:)` and receive
-/// `ContributionCalendar`. Do not change the signature.
 public struct Scraper: Sendable {
     public static let userAgent = "gh-wallpaper/0.1 (+https://github.com/diegorico/gh-wallpaper)"
 

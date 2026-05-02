@@ -29,9 +29,8 @@ public func renderHash(
         hasher.update(data: Data("\n".utf8))
     }
 
-    // Theme: id + colors. Stream C may add fields here; including them later
-    // simply means the hash changes once on upgrade, which is the correct
-    // behavior (we want to re-render).
+    // Theme: id + colors. New theme fields hash in here automatically —
+    // the hash changes once on upgrade, forcing a re-render, which is correct.
     hasher.update(data: Data("theme:".utf8))
     hasher.update(data: Data(theme.id.utf8))
     hasher.update(data: Data("|".utf8))

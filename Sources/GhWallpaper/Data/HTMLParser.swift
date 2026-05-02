@@ -9,8 +9,6 @@ import Foundation
 ///
 /// If GitHub ever changes the markup shape (e.g., switches back to inline SVG),
 /// the canary CI job (.github/workflows/canary.yml) will catch it within ~24h.
-///
-/// FROZEN INTERFACE.
 public struct HTMLParser: Sendable {
     public init() {}
 

@@ -1,9 +1,6 @@
 import Foundation
 
 /// Composes the wallpaper SVG from contribution data + theme + canvas geometry.
-///
-/// FROZEN INTERFACE — Wave 2 Stream B replaces the placeholder `<text>` headline
-/// with the rectangle-letterform composer; the `build(...)` signature stays.
 public struct SVGBuilder: Sendable {
     public struct Canvas: Equatable, Hashable, Sendable {
         public let widthPx: Int

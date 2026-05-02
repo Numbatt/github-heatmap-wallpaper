@@ -32,7 +32,8 @@ public struct WallpaperSetter {
     }
 
     /// Returns the URL of the current wallpaper for a screen, if any.
-    /// Used by Stream D's capture/restore flow.
+    /// Used by `CaptureRestore` to snapshot the prior wallpaper before
+    /// the daemon overwrites it.
     public func currentURL(for display: DisplayInfo) -> URL? {
         guard let screen = NSScreen.screens.first(where: { screen in
             (screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?

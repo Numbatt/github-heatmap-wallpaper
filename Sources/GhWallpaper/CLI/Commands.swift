@@ -1,11 +1,17 @@
 import AppKit
 import Foundation
 
-/// Subcommand dispatcher. Replaces the M1 spike's hardcoded entrypoint.
+/// Subcommand dispatcher: maps `argv` to a `runX(...)` handler.
 public enum Commands {
 
     public static func dispatch(_ argv: [String]) async -> Int32 {
-        let args = Array(argv.dropFirst())  // drop binary name
+        var args = Array(argv.dropFirst())  // drop binary name
+        // Strip -v / --verbose from anywhere in the arg list. Enables
+        // stderr-mirror for Logger output across all subcommands.
+        if let idx = args.firstIndex(where: { $0 == "-v" || $0 == "--verbose" }) {
+            args.remove(at: idx)
+            Logger.shared.consoleMirror = .debug
+        }
         guard let first = args.first else {
             // `gh-wallpaper` with no args → wizard
             return await runWizard()
@@ -22,8 +28,8 @@ public enum Commands {
         case "diagnose":                 return runDiagnose()
         case "uninstall":                return runUninstall()
         default:
-            // Backward-compat with M1 spike: `gh-wallpaper <username>`
-            // sets username + runs a one-shot render.
+            // Convenience: `gh-wallpaper <username>` runs a one-shot render
+            // for that user without touching saved config.
             return await runRender(args: ["--user", first])
         }
     }
@@ -127,7 +133,7 @@ public enum Commands {
         if let mode = config?.displays {
             print("\ncurrent setting: \(mode.serialized)")
         }
-        print("(set via `gh-wallpaper` wizard; v0.1 always renders to all displays)")
+        print("(change with `gh-wallpaper` to re-run the setup wizard)")
         return 0
     }
 
@@ -274,6 +280,8 @@ public enum Commands {
           gh-wallpaper diagnose                Print install state, last refresh, errors
           gh-wallpaper uninstall               Full clean: launchd + config + restore prior wallpaper
           gh-wallpaper --daemon                Run the daemon (used by launchd)
+
+        Pass -v / --verbose to mirror debug logs to stderr.
 
         Privacy: scrapes the public profile only. No PAT, no auth, no telemetry.
         """)

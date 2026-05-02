@@ -1,8 +1,8 @@
 import AppKit
 import Foundation
 
-/// Long-running process that owns the refresh loop. Started with
-/// `gh-wallpaper --daemon` (Wave 3 may rename to `gh-wallpaper start`).
+/// Long-running process that owns the refresh loop. Started by launchd via
+/// `gh-wallpaper --daemon`.
 ///
 /// Architecture (SPEC §2, §3, §10, §11):
 ///
