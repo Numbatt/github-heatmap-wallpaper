@@ -1,6 +1,6 @@
 import Foundation
 
-/// Hand-designed rectangle-pixel letterforms for the headline `DESIGN.  BUILD.  SHIP.`
+/// Hand-designed rectangle-pixel letterforms for the headline `DESIGN  BUILD  SHIP`
 ///
 /// Each glyph is authored as an ASCII grid. `#` = filled cell, `.` (or space)
 /// = empty. Each line of the source string is one row of the glyph (top to

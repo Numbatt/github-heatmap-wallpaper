@@ -74,7 +74,7 @@ public struct SVGBuilder: Sendable {
         // from a top, so we provide topGuess and let it overflow upward only
         // if the actual height ends up smaller (it won't shift visually since
         // we're using the bottom anchor for positioning the heatmap).
-        let headlineText = "DESIGN.  BUILD.  SHIP."
+        let headlineText = "DESIGN  BUILD  SHIP"
         var actualHeadlineHeight: Double = targetHeadlineHeight
         // Re-anchor: position headline so its rendered bottom ≈ headlineBottom.
         // We do a two-pass: first pass computes actualHeight; second pass renders
