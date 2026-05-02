@@ -1,0 +1,24 @@
+{
+    "configurations": [
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:github-heatmap-wallpaper}",
+            "name": "Debug gh-wallpaper",
+            "target": "gh-wallpaper",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug gh-wallpaper"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:github-heatmap-wallpaper}",
+            "name": "Release gh-wallpaper",
+            "target": "gh-wallpaper",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release gh-wallpaper"
+        }
+    ]
+}

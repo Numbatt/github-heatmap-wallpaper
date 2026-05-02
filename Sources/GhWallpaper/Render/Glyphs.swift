@@ -42,37 +42,37 @@ enum Glyphs {
     ///     continuous vertical stem.
     private static let sources: [Character: String] = [
 
-        // D — top + bottom bars; both rails full height; no middle bar.
+        // D — continuous top + bottom bars; both rails full height; no middle.
         "D": """
-        ##.###.##
+        #########
         ##.....##
         ##.....##
         ##.....##
         ##.....##
         ##.....##
-        ##.###.##
+        #########
         """,
 
-        // E — three bars + left rail only.
+        // E — three continuous bars + left rail only. Middle bar is shorter.
         "E": """
-        ##.###.##
+        #########
         ##.......
         ##.......
-        ##.###...
+        ######...
         ##.......
         ##.......
-        ##.###.##
+        #########
         """,
 
-        // S — three bars; top-left rail; bottom-right rail.
+        // S — three continuous bars; top-left rail; bottom-right rail.
         "S": """
-        ##.###.##
+        #########
         ##.......
         ##.......
-        ##.###.##
+        #########
         .......##
         .......##
-        ##.###.##
+        #########
         """,
 
         // I — single column, full height.
@@ -88,16 +88,16 @@ enum Glyphs {
 
         // G — like C with a horizontal tongue mid-right.
         "G": """
-        ##.###.##
+        #########
         ##.......
         ##.......
-        ##...##.#
+        ##...####
         ##.....##
         ##.....##
-        ##.###.##
+        #########
         """,
 
-        // N — both rails + diagonal staircase.
+        // N — both rails + diagonal staircase between them.
         "N": """
         ##.....##
         ###....##
@@ -108,18 +108,18 @@ enum Glyphs {
         ##.....##
         """,
 
-        // B — three bars + both rails.
+        // B — three continuous bars + both rails.
         "B": """
-        ##.###.##
+        #########
         ##.....##
         ##.....##
-        ##.###.##
+        #########
         ##.....##
         ##.....##
-        ##.###.##
+        #########
         """,
 
-        // U — both rails + bottom bar (no top bar).
+        // U — both rails + continuous bottom bar (no top bar).
         "U": """
         ##.....##
         ##.....##
@@ -127,10 +127,10 @@ enum Glyphs {
         ##.....##
         ##.....##
         ##.....##
-        ##.###.##
+        #########
         """,
 
-        // L — left rail + bottom bar.
+        // L — left rail + continuous bottom bar.
         "L": """
         ##.......
         ##.......
@@ -138,15 +138,15 @@ enum Glyphs {
         ##.......
         ##.......
         ##.......
-        ##.###.##
+        #########
         """,
 
-        // H — both rails + middle bar (no top/bottom bars).
+        // H — both rails + continuous middle bar (no top/bottom bars).
         "H": """
         ##.....##
         ##.....##
         ##.....##
-        ##.###.##
+        #########
         ##.....##
         ##.....##
         ##.....##
@@ -154,10 +154,10 @@ enum Glyphs {
 
         // P — top + middle bars; both rails on top half; left rail bottom.
         "P": """
-        ##.###.##
+        #########
         ##.....##
         ##.....##
-        ##.###.##
+        #########
         ##.......
         ##.......
         ##.......
