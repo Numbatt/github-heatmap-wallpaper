@@ -8,7 +8,12 @@ class GhWallpaper < Formula
 
   head "https://github.com/Numbatt/github-heatmap-wallpaper.git", branch: "main"
 
-  depends_on xcode: ["15.0", :build]
+  # No `depends_on xcode` — Homebrew enforces it as full Xcode.app, which
+  # most macOS users don't have. The Swift toolchain that ships with Apple's
+  # Command Line Tools (`xcode-select --install`) compiles this package fine.
+  # If `swift` isn't on PATH at install time, Homebrew's build will fail with
+  # a clear "swift: command not found" — much friendlier than blocking
+  # everyone-without-the-full-IDE up front.
   depends_on macos: :sonoma
   depends_on "resvg"
 
