@@ -1,0 +1,135 @@
+name: Bottle
+
+# Builds Homebrew bottles for arm64 macOS on every pushed tag, attaches
+# them to the corresponding GitHub Release, and writes the resulting
+# `bottle do` snippet to the workflow summary so the maintainer can
+# paste it into Formula/gh-wallpaper.rb.
+#
+# Workflow summary:
+#   1. Push tag vX.Y.Z
+#   2. CI builds bottles on macos-14 (Sonoma) + macos-15 (Sequoia)
+#   3. Bottles get uploaded to the release as assets
+#   4. Workflow summary shows the bottle do block
+#   5. Maintainer runs `script/update-bottle-block.sh vX.Y.Z` locally
+#      to pull the snippet, edit both formulas, and push.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing tag to (re-)bottle (e.g. v0.1.0)'
+        required: true
+
+jobs:
+  build-bottle:
+    name: Build bottle on ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14, macos-15]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Resolve tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag=${{ github.event.inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.tag.outputs.tag }}
+
+      - name: Install resvg (build-time dep)
+        run: brew install resvg
+
+      - name: Stage formula in a local tap (with bottle block stripped)
+        run: |
+          set -ex
+          TAP_DIR="$(brew --repository)/Library/Taps/local/homebrew-dev"
+          mkdir -p "$TAP_DIR/Formula"
+          # Homebrew won't re-bottle if a matching block is already there.
+          awk '
+            BEGIN { in_block = 0 }
+            /^[[:space:]]*bottle do[[:space:]]*$/ { in_block = 1; next }
+            in_block && /^[[:space:]]*end[[:space:]]*$/ { in_block = 0; next }
+            !in_block { print }
+          ' Formula/gh-wallpaper.rb > "$TAP_DIR/Formula/gh-wallpaper.rb"
+
+      - name: Build + bottle
+        env:
+          ROOT_URL: https://github.com/${{ github.repository }}/releases/download/${{ steps.tag.outputs.tag }}
+        run: |
+          set -ex
+          brew install --build-bottle local/dev/gh-wallpaper
+          brew bottle --root-url="$ROOT_URL" --json local/dev/gh-wallpaper
+
+          # `brew bottle` writes filenames with `--` between formula and version.
+          # Homebrew constructs URLs from `root_url` with a single `-`, so the
+          # release asset name has to use single dash. Rename here.
+          for f in *--*.bottle.*.tar.gz; do
+            mv "$f" "$(echo "$f" | sed 's/--/-/')"
+          done
+
+      - name: Upload bottle to release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          set -ex
+          for f in gh-wallpaper-*.bottle.*.tar.gz; do
+            gh release upload "$TAG" "$f" --clobber --repo "${{ github.repository }}"
+          done
+
+      - name: Upload bottle JSON as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bottle-json-${{ matrix.os }}
+          path: '*.bottle.*.json'
+          if-no-files-found: error
+
+  summarize:
+    name: Print bottle do block
+    needs: build-bottle
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: bottles
+          pattern: bottle-json-*
+          merge-multiple: true
+
+      - name: Compose bottle block
+        run: |
+          python3 <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json, glob, os
+          entries = []
+          root_url = None
+          rebuild = None
+          for path in sorted(glob.glob('bottles/*.bottle.*.json')):
+              with open(path) as f:
+                  data = json.load(f)
+              for _, info in data.items():
+                  bottle = info['bottle']
+                  if root_url is None:
+                      root_url = bottle.get('root_url')
+                      rebuild = bottle.get('rebuild', 0)
+                  for tag, tag_info in bottle.get('tags', {}).items():
+                      entries.append((tag, tag_info['sha256']))
+          out = ['## Bottle block', '', 'Paste into `Formula/gh-wallpaper.rb` (replace any existing `bottle do` block):', '', '```ruby', '  bottle do']
+          if root_url:
+              out.append(f'    root_url "{root_url}"')
+          if rebuild and rebuild > 0:
+              out.append(f'    rebuild {rebuild}')
+          for tag, sha in sorted(entries):
+              out.append(f'    sha256 cellar: :any_skip_relocation, {tag}: "{sha}"')
+          out.append('  end')
+          out.append('```')
+          out.append('')
+          out.append('Then run `script/update-bottle-block.sh <tag>` locally to push to both this repo and the tap.')
+          print('\n'.join(out))
+          PY
