@@ -30,42 +30,52 @@ enum Glyphs {
     /// ASCII grid sources for each glyph. Edit these strings to redesign any
     /// letter. Re-build to apply.
     ///
-    /// Standard pixel-font model: each letter is a 6×7 grid (except `I` which
-    /// is 1×7 per the reference) where filled cells (`#`) form the letter
-    /// shape exactly the way a chunky sans-serif letter would when pixelated
-    /// at low resolution.
+    /// Layout model (matches `image-1.png`):
+    ///   - 9 columns × 7 rows per letter (1 column for `I`).
+    ///   - Top/bottom bars are split into 3 segments by 2 single-cell gaps
+    ///     (`##.###.##`). The bar's end-segments sit in cols 0-1 and 7-8.
+    ///   - Side rails are paired blocks (`##.....##`) in cols 0-1 and 7-8 —
+    ///     the SAME columns as the bar end-segments — so the rails extend
+    ///     vertically from the bars without offset (the "curve overlap").
+    ///   - A thin background gap is rendered between rows (see Headline.swift)
+    ///     so each rail block reads as a discrete chunk rather than a
+    ///     continuous vertical stem.
     private static let sources: [Character: String] = [
 
+        // D — top + bottom bars; both rails full height; no middle bar.
         "D": """
-        #####.
-        #....#
-        #....#
-        #....#
-        #....#
-        #....#
-        #####.
+        ##.###.##
+        ##.....##
+        ##.....##
+        ##.....##
+        ##.....##
+        ##.....##
+        ##.###.##
         """,
 
+        // E — three bars + left rail only.
         "E": """
-        ######
-        #.....
-        #.....
-        #####.
-        #.....
-        #.....
-        ######
+        ##.###.##
+        ##.......
+        ##.......
+        ##.###...
+        ##.......
+        ##.......
+        ##.###.##
         """,
 
+        // S — three bars; top-left rail; bottom-right rail.
         "S": """
-        .#####
-        #.....
-        #.....
-        .####.
-        .....#
-        .....#
-        #####.
+        ##.###.##
+        ##.......
+        ##.......
+        ##.###.##
+        .......##
+        .......##
+        ##.###.##
         """,
 
+        // I — single column, full height.
         "I": """
         #
         #
@@ -76,83 +86,91 @@ enum Glyphs {
         #
         """,
 
+        // G — like C with a horizontal tongue mid-right.
         "G": """
-        .####.
-        #....#
-        #.....
-        #..###
-        #....#
-        #....#
-        .####.
+        ##.###.##
+        ##.......
+        ##.......
+        ##...##.#
+        ##.....##
+        ##.....##
+        ##.###.##
         """,
 
+        // N — both rails + diagonal staircase.
         "N": """
-        #....#
-        ##...#
-        #.#..#
-        #..#.#
-        #...##
-        #....#
-        #....#
+        ##.....##
+        ###....##
+        ##.#...##
+        ##..#..##
+        ##...#.##
+        ##....###
+        ##.....##
         """,
 
+        // B — three bars + both rails.
         "B": """
-        #####.
-        #....#
-        #....#
-        #####.
-        #....#
-        #....#
-        #####.
+        ##.###.##
+        ##.....##
+        ##.....##
+        ##.###.##
+        ##.....##
+        ##.....##
+        ##.###.##
         """,
 
+        // U — both rails + bottom bar (no top bar).
         "U": """
-        #....#
-        #....#
-        #....#
-        #....#
-        #....#
-        #....#
-        .####.
+        ##.....##
+        ##.....##
+        ##.....##
+        ##.....##
+        ##.....##
+        ##.....##
+        ##.###.##
         """,
 
+        // L — left rail + bottom bar.
         "L": """
-        #.....
-        #.....
-        #.....
-        #.....
-        #.....
-        #.....
-        ######
+        ##.......
+        ##.......
+        ##.......
+        ##.......
+        ##.......
+        ##.......
+        ##.###.##
         """,
 
+        // H — both rails + middle bar (no top/bottom bars).
         "H": """
-        #....#
-        #....#
-        #....#
-        ######
-        #....#
-        #....#
-        #....#
+        ##.....##
+        ##.....##
+        ##.....##
+        ##.###.##
+        ##.....##
+        ##.....##
+        ##.....##
         """,
 
+        // P — top + middle bars; both rails on top half; left rail bottom.
         "P": """
-        #####.
-        #....#
-        #....#
-        #####.
-        #.....
-        #.....
-        #.....
+        ##.###.##
+        ##.....##
+        ##.....##
+        ##.###.##
+        ##.......
+        ##.......
+        ##.......
         """,
 
+        // . (period) — small block on the baseline.
         ".": """
         ..
         ..
         ..
         ..
         ..
-        ..
+        ##
         ##
         """,
     ]

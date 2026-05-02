@@ -53,6 +53,16 @@ func renderHeadline(
     let originX = centerX - totalWidth / 2
     let originY = topY
 
+    // Vertical inset only: rows render shorter than their cell height, leaving
+    // a thin background gap above and below each row. Horizontal inset is 0
+    // so adjacent `#` cells in the same row still merge into one continuous
+    // bar (the parser coalesces, the renderer doesn't break the merge).
+    //
+    // Result: stacked rows in the same column visibly separate (the
+    // "small gaps between the lines" effect from image-1.png), while a row
+    // of #### remains a solid bar.
+    let rowInset = 0.10  // 10% on each side vertically = 80% rect height, 20% gap
+
     // 4. Emit rects.
     var svg = ""
     prevWasLetter = false
@@ -68,9 +78,9 @@ func renderHeadline(
         if let rects = Glyphs.glyph(for: ch) {
             for r in rects {
                 let x = originX + Double(cursorCols + r.x) * unit
-                let y = originY + Double(r.y) * unit
+                let y = originY + Double(r.y) * unit + rowInset * unit
                 let w = Double(r.w) * unit
-                let h = Double(r.h) * unit
+                let h = Double(r.h) * unit - 2 * rowInset * unit
                 svg += #"  <rect x="\#(fmt(x))" y="\#(fmt(y))" "#
                 svg += #"width="\#(fmt(w))" height="\#(fmt(h))" "#
                 svg += #"fill="\#(color)" shape-rendering="crispEdges"/>"# + "\n"
