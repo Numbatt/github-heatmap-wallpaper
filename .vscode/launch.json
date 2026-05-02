@@ -19,6 +19,26 @@
             "target": "gh-wallpaper",
             "configuration": "release",
             "preLaunchTask": "swift: Build Release gh-wallpaper"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:github-heatmap-wallpaper}",
+            "name": "Debug SnapshotGen",
+            "target": "SnapshotGen",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug SnapshotGen"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:github-heatmap-wallpaper}",
+            "name": "Release SnapshotGen",
+            "target": "SnapshotGen",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release SnapshotGen"
         }
     ]
 }

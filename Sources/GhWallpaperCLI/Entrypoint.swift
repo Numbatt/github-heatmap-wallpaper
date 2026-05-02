@@ -1,6 +1,8 @@
 import Foundation
+import GhWallpaper
 
-// Entry point. All dispatch logic lives in CLI/Commands.swift.
+// Entry point. All dispatch logic lives in the GhWallpaper library
+// (Sources/GhWallpaper/CLI/Commands.swift).
 
 @main
 struct GhWallpaperEntrypoint {
