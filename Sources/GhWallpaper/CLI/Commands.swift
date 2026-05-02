@@ -69,7 +69,20 @@ public enum Commands {
             ))
             return 1
         }
-        let theme = themeID.flatMap(Themes.byId) ?? config?.resolvedTheme() ?? Themes.githubDark
+        // If --theme was passed, it must resolve. Silent fall-through to the
+        // default would render a wallpaper that ignores the user's request.
+        let theme: Theme
+        if let themeID {
+            guard let resolved = Themes.byId(themeID) else {
+                FileHandle.standardError.write(Data(
+                    "unknown theme: \(themeID) (valid: github-dark, github-light, paper, midnight, auto)\n".utf8
+                ))
+                return 1
+            }
+            theme = resolved
+        } else {
+            theme = config?.resolvedTheme() ?? Themes.githubDark
+        }
         return await renderOneShot(username: user, theme: theme, setWallpaper: false)
     }
 
