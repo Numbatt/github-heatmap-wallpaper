@@ -18,7 +18,9 @@ class GhWallpaper < Formula
   depends_on "resvg"
 
   def install
-    system "swift", "build", "--disable-sandbox", "-c", "release"
+    # Only build the gh-wallpaper product (skip the dev-only SnapshotGen
+    # target). Saves ~5–10 sec of compile + link time for end users.
+    system "swift", "build", "--disable-sandbox", "-c", "release", "--product", "gh-wallpaper"
     bin.install ".build/release/gh-wallpaper"
     # Re-sign ad-hoc in place. macOS Sequoia/Tahoe attaches a
     # `com.apple.provenance` xattr to copied binaries which, combined
