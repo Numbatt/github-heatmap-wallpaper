@@ -22,16 +22,10 @@ public struct Wizard {
             print("warning: \(username) doesn't appear to exist on github.com — continuing anyway. You can re-run the wizard to fix.")
         }
 
-        // Theme
-        print("\nThemes:")
-        print("  1) github-dark   2) github-light   3) paper   4) midnight   5) auto (matches macOS appearance)")
-        let themeID: String = ask(
-            prompt: "Theme",
-            defaultValue: existing?.themeID ?? "github-dark",
-            validator: { input in
-                Themes.byId(input) == nil ? "unknown theme; pick one of: github-dark, github-light, paper, midnight, auto" : nil
-            }
-        )
+        // Theme — ordered most-likely first. Accepts a number (1–5) or the
+        // theme ID. Visible labels for `auto` use GitHub's wording ("sync
+        // with system") but the persisted ID stays `auto` for stability.
+        let themeID = pickTheme(existing: existing?.themeID)
 
         // Displays — numbered picker. The user can type "all", "main",
         // or comma-separated indices ("1", "1,3").
@@ -162,6 +156,49 @@ public struct Wizard {
         log: \(Paths.logFile.path)
         run `gh-wallpaper --help` for commands.
         """)
+    }
+
+    /// Theme picker. Lists themes most-likely-first, accepts either a number
+    /// (1–N) or the theme ID. Re-prompts until the user picks something valid.
+    private func pickTheme(existing: String?) -> String {
+        // Order intentionally: auto first (most flexible), then dark/light,
+        // then specialty themes. Display labels are user-friendly; the
+        // persisted IDs stay aligned with `Themes.byId(_:)`.
+        let choices: [(id: String, label: String)] = [
+            ("auto", "auto — sync with system appearance"),
+            ("github-dark", "github-dark"),
+            ("github-light", "github-light"),
+            ("midnight", "midnight"),
+            ("paper", "paper"),
+        ]
+        print("\nThemes:")
+        for (i, choice) in choices.enumerated() {
+            print("  \(i + 1)) \(choice.label)")
+        }
+        // Default: existing config if re-running, else option 1 (auto).
+        let defaultLabel: String = {
+            if let existing, choices.contains(where: { $0.id == existing }) {
+                if let idx = choices.firstIndex(where: { $0.id == existing }) {
+                    return "\(idx + 1)"
+                }
+                return existing
+            }
+            return "1"
+        }()
+        while true {
+            print("Theme [\(defaultLabel)]: ", terminator: "")
+            let raw = (readLine() ?? "").trimmingCharacters(in: .whitespaces)
+            let input = raw.isEmpty ? defaultLabel : raw
+            // Accept either a number or a theme ID.
+            if let n = Int(input), (1...choices.count).contains(n) {
+                return choices[n - 1].id
+            }
+            if Themes.byId(input) != nil {
+                return input
+            }
+            let validIDs = choices.map { $0.id }.joined(separator: ", ")
+            print("  → pick a number 1–\(choices.count) or one of: \(validIDs)")
+        }
     }
 
     /// Renders a numbered list of detected displays and prompts the user to
