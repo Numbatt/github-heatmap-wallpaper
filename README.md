@@ -4,8 +4,6 @@ Your GitHub contribution heatmap as your macOS desktop wallpaper. Refreshes itse
 
 ![Wallpaper preview](image.png)
 
-> Replace `image.png` with a real screenshot before tagging v0.1.
-
 ---
 
 ## Install
