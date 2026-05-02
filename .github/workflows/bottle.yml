@@ -22,6 +22,11 @@ on:
         description: 'Existing tag to (re-)bottle (e.g. v0.1.0)'
         required: true
 
+permissions:
+  # Needed to upload .tar.gz release assets via `gh release upload`.
+  # Default GITHUB_TOKEN is read-only; bumping to write here only.
+  contents: write
+
 jobs:
   build-bottle:
     name: Build bottle on ${{ matrix.os }}
