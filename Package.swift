@@ -1,9 +1,9 @@
-// swift-tools-version:5.9
+// swift-tools-version:5.7
 import PackageDescription
 
 let package = Package(
     name: "gh-wallpaper",
-    platforms: [.macOS(.v14)],
+    platforms: [.macOS("14.0")],
     products: [
         .executable(name: "gh-wallpaper", targets: ["GhWallpaperCLI"])
     ],
