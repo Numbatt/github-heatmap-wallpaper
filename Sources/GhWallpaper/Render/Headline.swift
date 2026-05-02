@@ -4,7 +4,7 @@ import Foundation
 /// elements built from the hand-designed glyphs in `Glyphs`. No fonts.
 ///
 /// Sizing: the caller passes `targetHeight` (the desired height in points if it
-/// fits) and `maxWidth` (a hard width cap — typically `0.85 × canvas_width`).
+/// fits) and `maxWidth` (a hard width cap — typically `0.70 × canvas_width`).
 /// We scale the 7-row glyph grid so the headline stands `targetHeight` tall
 /// **unless** that produces a width > `maxWidth`, in which case we shrink down
 /// so the headline fits. Returns the actual rendered height in `actualHeight`

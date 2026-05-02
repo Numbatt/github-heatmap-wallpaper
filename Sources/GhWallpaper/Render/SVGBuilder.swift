@@ -26,18 +26,20 @@ public struct SVGBuilder: Sendable {
 
         // Sizing rules:
         //   Headline target height = 12% of short edge, capped at 600pt.
-        //   Headline width is hard-capped at 85% of canvas width — if the
+        //   Headline width is hard-capped at 70% of canvas width — if the
         //   intrinsic glyph width at target height would overflow, the
-        //   headline scales down (Headline.swift handles the clamp).
-        //   Heatmap fills 85% of canvas width; height follows from the 53×7 grid.
+        //   headline scales down (Headline.swift handles the clamp). The
+        //   headline cap is intentionally tighter than the heatmap so the
+        //   heatmap reads as the dominant horizontal element.
+        //   Heatmap fills 75% of canvas width; height follows from the 53×7 grid.
         //
         // Layout (rule of thirds, headline-dominant):
         //   - title baseline at h × 0.30
         //   - heatmap top at h × 0.55
         //   - balanced top/bottom margins
         let targetHeadlineHeight = min(0.12 * min(w, h), 600)
-        let maxHeadlineWidth = w * 0.85
-        let heatmapWidth = w * 0.85
+        let maxHeadlineWidth = w * 0.70
+        let heatmapWidth = w * 0.75
         let heatmapCenterX = w / 2
         let heatmapTop = h * 0.55
 

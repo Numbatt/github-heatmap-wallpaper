@@ -31,12 +31,11 @@ enum Glyphs {
     /// letter. Re-build to apply.
     ///
     /// Layout model (matches `image-1.png`):
-    ///   - 9 columns × 7 rows per letter (1 column for `I`).
-    ///   - Top/bottom bars are split into 3 segments by 2 single-cell gaps
-    ///     (`##.###.##`). The bar's end-segments sit in cols 0-1 and 7-8.
-    ///   - Side rails are paired blocks (`##.....##`) in cols 0-1 and 7-8 —
-    ///     the SAME columns as the bar end-segments — so the rails extend
-    ///     vertically from the bars without offset (the "curve overlap").
+    ///   - 7 columns × 7 rows per letter (2 columns for `I` and `.`).
+    ///   - Bars run continuously; side rails are 2-cell-wide blocks at cols 0-1
+    ///     and 5-6 (or cols 0-1 only for left-rail-only letters like E, L).
+    ///   - For curved letters (D, B, P) the top/bottom bar leaves col 6 empty
+    ///     so the bar visually flows into the right rail just below.
     ///   - A thin background gap is rendered between rows (see Headline.swift)
     ///     so each rail block reads as a discrete chunk rather than a
     ///     continuous vertical stem.
@@ -44,123 +43,123 @@ enum Glyphs {
 
         // D — continuous top + bottom bars; both rails full height; no middle.
         "D": """
-        #########
-        ##.....##
-        ##.....##
-        ##.....##
-        ##.....##
-        ##.....##
-        #########
+        ######.
+        ##...##
+        ##...##
+        ##...##
+        ##...##
+        ##...##
+        ######.
         """,
 
         // E — three continuous bars + left rail only. Middle bar is shorter.
         "E": """
-        #########
-        ##.......
-        ##.......
-        ######...
-        ##.......
-        ##.......
-        #########
+        #######
+        ##.....
+        ##.....
+        ####...
+        ##.....
+        ##.....
+        #######
         """,
 
         // S — three continuous bars; top-left rail; bottom-right rail.
         "S": """
-        #########
-        ##.......
-        ##.......
-        #########
-        .......##
-        .......##
-        #########
+        #######
+        ##.....
+        ##.....
+        #######
+        .....##
+        .....##
+        #######
         """,
 
-        // I — single column, full height.
+        // I — two columns, full height.
         "I": """
-        #
-        #
-        #
-        #
-        #
-        #
-        #
+        ##
+        ##
+        ##
+        ##
+        ##
+        ##
+        ##
         """,
 
         // G — like C with a horizontal tongue mid-right.
         "G": """
-        #########
-        ##.......
-        ##.......
-        ##...####
-        ##.....##
-        ##.....##
-        #########
+        #######
+        ##.....
+        ##.....
+        ##..###
+        ##...##
+        ##...##
+        #######
         """,
 
         // N — both rails + diagonal staircase between them.
         "N": """
-        ##.....##
-        ###....##
-        ##.#...##
-        ##..#..##
-        ##...#.##
-        ##....###
-        ##.....##
+        ##...##
+        ###..##
+        ###..##
+        ##.#.##
+        ##..###
+        ##..###
+        ##...##
         """,
 
         // B — three continuous bars + both rails.
         "B": """
-        #########
-        ##.....##
-        ##.....##
-        #########
-        ##.....##
-        ##.....##
-        #########
+        #######.
+        ##....##
+        ##....##
+        #######.
+        ##....##
+        ##....##
+        #######.
         """,
 
         // U — both rails + continuous bottom bar (no top bar).
         "U": """
-        ##.....##
-        ##.....##
-        ##.....##
-        ##.....##
-        ##.....##
-        ##.....##
-        #########
+        ##...##
+        ##...##
+        ##...##
+        ##...##
+        ##...##
+        ##...##
+        #######
         """,
 
         // L — left rail + continuous bottom bar.
         "L": """
-        ##.......
-        ##.......
-        ##.......
-        ##.......
-        ##.......
-        ##.......
-        #########
+        ##.....
+        ##.....
+        ##.....
+        ##.....
+        ##.....
+        ##.....
+        #######
         """,
 
         // H — both rails + continuous middle bar (no top/bottom bars).
         "H": """
-        ##.....##
-        ##.....##
-        ##.....##
-        #########
-        ##.....##
-        ##.....##
-        ##.....##
+        ##...##
+        ##...##
+        ##...##
+        #######
+        ##...##
+        ##...##
+        ##...##
         """,
 
         // P — top + middle bars; both rails on top half; left rail bottom.
         "P": """
-        #########
-        ##.....##
-        ##.....##
-        #########
-        ##.......
-        ##.......
-        ##.......
+        ######.
+        ##...##
+        ##...##
+        ######.
+        ##.....
+        ##.....
+        ##.....
         """,
 
         // . (period) — small block on the baseline.
@@ -170,7 +169,7 @@ enum Glyphs {
         ..
         ..
         ..
-        ##
+        ..
         ##
         """,
     ]
