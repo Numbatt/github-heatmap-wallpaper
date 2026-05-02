@@ -228,11 +228,15 @@ public actor Daemon {
         }
 
         var perDisplayFailed = false
+        // Timestamp suffix forces NSWorkspace.setDesktopImageURL to treat each
+        // render as a new file (macOS caches by path; same path, new content =
+        // silent no-op). Old PNGs for this display are cleaned up after success.
+        let stamp = String(Int(Date().timeIntervalSince1970 * 1000))
         for display in displays {
             let canvas = SVGBuilder.Canvas(widthPx: display.widthPx, heightPx: display.heightPx)
             let svg = svgBuilder.build(calendar: calendar, theme: config.theme, canvas: canvas)
-            let livePNG = outputDir.appendingPathComponent("wallpaper-\(display.uuid).png")
-            let tempPNG = outputDir.appendingPathComponent("wallpaper-\(display.uuid).new.png")
+            let livePNG = outputDir.appendingPathComponent("wallpaper-\(display.uuid)-\(stamp).png")
+            let tempPNG = outputDir.appendingPathComponent("wallpaper-\(display.uuid)-\(stamp).new.png")
 
             // Rasterize to temp file (atomic promotion preserves last-good on failure).
             do {
@@ -278,10 +282,35 @@ public actor Daemon {
             return
         }
 
+        // Clean up older wallpaper PNGs for these displays so we don't accumulate
+        // disk garbage across thousands of refresh ticks.
+        cleanupOldWallpapers(in: outputDir, displays: displays, currentStamp: stamp)
+
         lastRenderHash = hash
         failureTracker.recordSuccess()
         let geom = displays.map { "\($0.widthPx)x\($0.heightPx)" }.joined(separator: ",")
         logger.info("refresh complete (hash=\(hash.prefix(12))… displays=\(displays.count) [\(geom)])")
+    }
+
+    /// Deletes `wallpaper-<UUID>-*.png` for each display except the file with
+    /// `currentStamp`. Best-effort: errors are ignored (will retry next tick).
+    private func cleanupOldWallpapers(in dir: URL, displays: [DisplayInfo], currentStamp: String) {
+        guard let entries = try? FileManager.default.contentsOfDirectory(
+            at: dir, includingPropertiesForKeys: nil
+        ) else { return }
+        let activeUUIDs = Set(displays.map { $0.uuid })
+        for entry in entries {
+            let name = entry.lastPathComponent
+            guard name.hasPrefix("wallpaper-"), name.hasSuffix(".png") else { continue }
+            // Match wallpaper-<UUID>(-<stamp>)?.png — keep current stamp; drop everything else.
+            let body = String(name.dropFirst("wallpaper-".count).dropLast(".png".count))
+            // Body looks like "<UUID>-<stamp>" or "<UUID>" (legacy) or "<UUID>-<stamp>.new"
+            if body.contains("-\(currentStamp)") { continue }
+            // Sanity: only delete if it starts with one of our active display UUIDs
+            if activeUUIDs.contains(where: { body.hasPrefix($0) }) {
+                try? FileManager.default.removeItem(at: entry)
+            }
+        }
     }
 
     /// Combines render-hash inputs across all connected displays so a display

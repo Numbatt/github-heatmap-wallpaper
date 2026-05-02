@@ -3,22 +3,27 @@ import Foundation
 /// Renders the headline text as a stitched-together stream of SVG `<rect>`
 /// elements built from the hand-designed glyphs in `Glyphs`. No fonts.
 ///
-/// The caller owns the sizing rule (12% of short edge, capped at 600pt) and
-/// passes us the resolved `targetHeight`. We scale the 7-row glyph grid so the
-/// total glyph block stands exactly `targetHeight` tall, then center it
-/// horizontally at `centerX`.
+/// Sizing: the caller passes `targetHeight` (the desired height in points if it
+/// fits) and `maxWidth` (a hard width cap — typically `0.85 × canvas_width`).
+/// We scale the 7-row glyph grid so the headline stands `targetHeight` tall
+/// **unless** that produces a width > `maxWidth`, in which case we shrink down
+/// so the headline fits. Returns the actual rendered height in `actualHeight`
+/// so the caller can lay out subsequent elements correctly.
 ///
 /// Returns SVG markup (no `<svg>` wrapper) — drop it directly into a parent SVG.
+@discardableResult
 func renderHeadline(
     text: String,
     color: String,
     centerX: Double,
     topY: Double,
-    targetHeight: Double
+    targetHeight: Double,
+    maxWidth: Double,
+    actualHeight: inout Double
 ) -> String {
     // Tracking constants, in grid columns.
-    let letterGap = 1   // tight kerning between adjacent letters
-    let wordGap   = 3   // wider gap on space (visually ~2× a normal letter gap)
+    let letterGap = 1
+    let wordGap   = 3
 
     // 1. Compute total glyph-grid width in columns for the whole text.
     var totalCols = 0
@@ -36,10 +41,12 @@ func renderHeadline(
         prevWasLetter = true
     }
 
-    // 2. Compute the unit size: every grid cell is `unit` points square.
-    //    The headline is 7 rows tall; that locks the unit.
-    let unit = targetHeight / Double(Glyphs.rows)
+    // 2. Compute unit size constrained by both height and width.
+    let unitFromHeight = targetHeight / Double(Glyphs.rows)
+    let unitFromWidth  = maxWidth / Double(totalCols)
+    let unit = min(unitFromHeight, unitFromWidth)
     let totalWidth = Double(totalCols) * unit
+    actualHeight = unit * Double(Glyphs.rows)
 
     // 3. Position cursor at the left edge of the centered block.
     var cursorCols = 0

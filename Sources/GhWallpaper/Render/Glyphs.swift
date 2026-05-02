@@ -32,15 +32,16 @@ enum Glyphs {
 
     // MARK: - Letterforms (5 cols × 7 rows unless noted)
 
-    /// `D` — full top + bottom bars, partial middle bar, both side rails.
+    /// `D` — full top + bottom bars, both side rails, NO middle bar.
+    /// (A middle bar would make this read as a `B`.)
     static let D: [Rect] = [
         // top bar
         (0, 0, 5, 1),
         // upper rails
         (0, 1, 1, 1), (4, 1, 1, 1),
         (0, 2, 1, 1), (4, 2, 1, 1),
-        // middle bar (partial — the inner "belly" line)
-        (0, 3, 4, 1),
+        // middle: rails only, no horizontal bar
+        (0, 3, 1, 1), (4, 3, 1, 1),
         // lower rails
         (0, 4, 1, 1), (4, 4, 1, 1),
         (0, 5, 1, 1), (4, 5, 1, 1),

@@ -24,22 +24,30 @@ public struct SVGBuilder: Sendable {
         let w = Double(canvas.widthPx)
         let h = Double(canvas.heightPx)
 
-        // Headline sizing rule (SPEC §8): 12% of short edge, capped.
-        let headlineHeight = min(0.12 * min(w, h), 600)
-
-        // Layout zones:
-        //   top margin   ~10% h
-        //   headline     headlineHeight
-        //   gap          headlineHeight * 0.4
-        //   heatmap      ~60% w wide, fills available
-        //   bottom margin ~25% h
-        let topMargin = h * 0.10
-        let headlineY = topMargin
-        let heatmapTop = headlineY + headlineHeight + headlineHeight * 0.4
-        let heatmapWidth = w * 0.60
+        // Sizing rules:
+        //   Headline target height = 12% of short edge, capped at 600pt.
+        //   Headline width is hard-capped at 85% of canvas width — if the
+        //   intrinsic glyph width at target height would overflow, the
+        //   headline scales down (Headline.swift handles the clamp).
+        //   Heatmap fills 85% of canvas width; height follows from the 53×7 grid.
+        //
+        // Layout (rule of thirds, headline-dominant):
+        //   - title baseline at h × 0.30
+        //   - heatmap top at h × 0.55
+        //   - balanced top/bottom margins
+        let targetHeadlineHeight = min(0.12 * min(w, h), 600)
+        let maxHeadlineWidth = w * 0.85
+        let heatmapWidth = w * 0.85
         let heatmapCenterX = w / 2
+        let heatmapTop = h * 0.55
 
-        // Heatmap layout
+        // Position the headline so its bottom sits at h × 0.40 (above the heatmap).
+        // We don't know actualHeight until renderHeadline runs (it might shrink
+        // to fit width), so we anchor by the bottom edge.
+        let headlineBottom = h * 0.40
+        let headlineTopGuess = headlineBottom - targetHeadlineHeight
+
+        // Heatmap layout — width-driven; cells are square so height follows.
         let layout = HeatmapLayout(
             days: calendar.days,
             targetWidth: heatmapWidth,
@@ -54,31 +62,47 @@ public struct SVGBuilder: Sendable {
         svg += "width=\"\(canvas.widthPx)\" height=\"\(canvas.heightPx)\" "
         svg += "viewBox=\"0 0 \(canvas.widthPx) \(canvas.heightPx)\">\n"
 
-        // Optional gradient defs (themes like `midnight` use this).
         if let gradient = theme.gradientSVG {
             svg += "  <defs>\n    \(gradient)\n  </defs>\n"
         }
 
-        // Background
         svg += #"  <rect x="0" y="0" width="100%" height="100%" fill="\#(theme.background)"/>"# + "\n"
 
-        // Headline — hand-designed rectangle letterforms (Wave 2 Stream B).
+        // Headline. Pass the bottom-anchor target — Headline.swift will lay out
+        // from a top, so we provide topGuess and let it overflow upward only
+        // if the actual height ends up smaller (it won't shift visually since
+        // we're using the bottom anchor for positioning the heatmap).
         let headlineText = "DESIGN.  BUILD.  SHIP."
+        var actualHeadlineHeight: Double = targetHeadlineHeight
+        // Re-anchor: position headline so its rendered bottom ≈ headlineBottom.
+        // We do a two-pass: first pass computes actualHeight; second pass renders
+        // with the correct top so the bottom edge lines up.
+        var throwaway = 0.0
+        _ = renderHeadline(
+            text: headlineText,
+            color: theme.headlineColor,
+            centerX: heatmapCenterX,
+            topY: headlineTopGuess,
+            targetHeight: targetHeadlineHeight,
+            maxWidth: maxHeadlineWidth,
+            actualHeight: &throwaway
+        )
+        actualHeadlineHeight = throwaway
+        let headlineTop = headlineBottom - actualHeadlineHeight
         svg += renderHeadline(
             text: headlineText,
             color: theme.headlineColor,
-            centerX: w / 2,
-            topY: headlineY,
-            targetHeight: headlineHeight
+            centerX: heatmapCenterX,
+            topY: headlineTop,
+            targetHeight: targetHeadlineHeight,
+            maxWidth: maxHeadlineWidth,
+            actualHeight: &actualHeadlineHeight
         )
 
-        // Heatmap cells
+        // Heatmap cells.
         let radius = layout.cells.first.map { $0.width * 0.25 } ?? 0
         for cell in layout.cells {
-            if cell.level < 0 {
-                // Transparent placeholder — skip rendering entirely.
-                continue
-            }
+            if cell.level < 0 { continue }
             let fill = theme.cellRamp[cell.level]
             svg += #"  <rect x="\#(round3(cell.x))" y="\#(round3(cell.y))" "#
             svg += #"width="\#(round3(cell.width))" height="\#(round3(cell.height))" "#

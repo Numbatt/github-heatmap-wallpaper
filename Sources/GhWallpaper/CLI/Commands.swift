@@ -202,18 +202,48 @@ public enum Commands {
             for display in displays {
                 let canvas = SVGBuilder.Canvas(widthPx: display.widthPx, heightPx: display.heightPx)
                 let svg = builder.build(calendar: calendar, theme: theme, canvas: canvas)
-                let png = Paths.wallpaperPNG(displayUUID: display.uuid)
+
+                // Write to a uniquely-suffixed path so macOS treats every render
+                // as a new image. Without this, NSWorkspace.setDesktopImageURL
+                // with the same path silently no-ops (the OS caches by path).
+                let suffix = String(Int(Date().timeIntervalSince1970 * 1000))
+                let png = Paths.wallpaperPNG(displayUUID: "\(display.uuid)-\(suffix)")
                 try rasterizer.rasterize(svg: svg, toPNG: png, widthPx: display.widthPx, heightPx: display.heightPx)
                 print("→ rendered \(png.lastPathComponent) (\(display.widthPx)×\(display.heightPx))")
                 if setWallpaper {
                     try setter.set(pngURL: png, on: display)
                 }
+
+                // Clean up older PNGs for this display so we don't accumulate
+                // disk garbage across thousands of refreshes.
+                cleanupOldWallpapers(displayUUID: display.uuid, keep: png)
             }
             if setWallpaper { print("done.") }
             return 0
         } catch {
             FileHandle.standardError.write(Data("error: \(error)\n".utf8))
             return 1
+        }
+    }
+
+    /// Deletes wallpaper-<UUID>-*.png files for the given display except `keep`.
+    /// Best-effort: ignores errors. Called after every render.
+    private static func cleanupOldWallpapers(displayUUID: String, keep: URL) {
+        let fm = FileManager.default
+        guard let entries = try? fm.contentsOfDirectory(at: Paths.supportDir, includingPropertiesForKeys: nil) else {
+            return
+        }
+        let prefix = "wallpaper-\(displayUUID)-"
+        for entry in entries where entry != keep {
+            if entry.lastPathComponent.hasPrefix(prefix) && entry.pathExtension == "png" {
+                try? fm.removeItem(at: entry)
+            }
+        }
+        // Also clean up the legacy non-suffixed file if it exists
+        // (from before we added cache-busting).
+        let legacy = Paths.supportDir.appendingPathComponent("wallpaper-\(displayUUID).png")
+        if FileManager.default.fileExists(atPath: legacy.path) && legacy != keep {
+            try? fm.removeItem(at: legacy)
         }
     }
 
