@@ -1,0 +1,273 @@
+import AppKit
+import Foundation
+
+/// Subcommand dispatcher. Replaces the M1 spike's hardcoded entrypoint.
+public enum Commands {
+
+    public static func dispatch(_ argv: [String]) async -> Int32 {
+        let args = Array(argv.dropFirst())  // drop binary name
+        guard let first = args.first else {
+            // `gh-wallpaper` with no args → wizard
+            return await runWizard()
+        }
+        switch first {
+        case "--help", "-h", "help":     return printHelp()
+        case "--daemon", "daemon":       return await runDaemon()
+        case "render":                   return await runRender(args: Array(args.dropFirst()))
+        case "refresh":                  return await runRefresh()
+        case "theme":                    return await runTheme(args: Array(args.dropFirst()))
+        case "pause":                    return runPause()
+        case "start":                    return runStart()
+        case "displays":                 return runDisplays()
+        case "diagnose":                 return runDiagnose()
+        case "uninstall":                return runUninstall()
+        default:
+            // Backward-compat with M1 spike: `gh-wallpaper <username>`
+            // sets username + runs a one-shot render.
+            return await runRender(args: ["--user", first])
+        }
+    }
+
+    // MARK: - Subcommands
+
+    private static func runWizard() async -> Int32 {
+        do {
+            let config = try await Wizard().run()
+            print("\nrunning a one-time render to verify…")
+            return await runRefreshOnce(config: config)
+        } catch {
+            FileHandle.standardError.write(Data("wizard failed: \(error)\n".utf8))
+            return 1
+        }
+    }
+
+    private static func runDaemon() async -> Int32 {
+        await Daemon().run()
+        return 0
+    }
+
+    private static func runRender(args: [String]) async -> Int32 {
+        var username: String? = nil
+        var themeID: String? = nil
+        var i = 0
+        while i < args.count {
+            switch args[i] {
+            case "--user":  username = args[safe: i + 1]; i += 2
+            case "--theme": themeID  = args[safe: i + 1]; i += 2
+            default: i += 1
+            }
+        }
+        let config = (try? ConfigStore.read()) ?? UserConfig(username: username ?? "diegorico")
+        let user = username ?? config.username
+        let theme = themeID.flatMap(Themes.byId) ?? config.resolvedTheme()
+        return await renderOneShot(username: user, theme: theme, setWallpaper: false)
+    }
+
+    private static func runRefresh() async -> Int32 {
+        guard let config = try? ConfigStore.read() else {
+            FileHandle.standardError.write(Data("no config; run `gh-wallpaper` to set up\n".utf8))
+            return 1
+        }
+        return await runRefreshOnce(config: config)
+    }
+
+    private static func runRefreshOnce(config: UserConfig) async -> Int32 {
+        return await renderOneShot(
+            username: config.username,
+            theme: config.resolvedTheme(),
+            setWallpaper: true
+        )
+    }
+
+    private static func runTheme(args: [String]) async -> Int32 {
+        guard let id = args.first else {
+            FileHandle.standardError.write(Data("usage: gh-wallpaper theme <github-dark|github-light|paper|midnight|auto>\n".utf8))
+            return 1
+        }
+        guard Themes.byId(id) != nil else {
+            FileHandle.standardError.write(Data("unknown theme: \(id)\n".utf8))
+            return 1
+        }
+        var config = (try? ConfigStore.read()) ?? UserConfig(username: "diegorico")
+        config.themeID = id
+        do {
+            try ConfigStore.write(config)
+            print("→ theme set to \(id); refreshing wallpaper…")
+            return await runRefreshOnce(config: config)
+        } catch {
+            FileHandle.standardError.write(Data("could not save config: \(error)\n".utf8))
+            return 1
+        }
+    }
+
+    private static func runPause() -> Int32 {
+        // Unload the launchd agent (gracefully — agent persists if reinstalled later).
+        return launchctl("bootout", "gui/\(getuid())/\(Paths.launchdLabel)")
+    }
+
+    private static func runStart() -> Int32 {
+        guard FileManager.default.fileExists(atPath: Paths.launchdPlist.path) else {
+            FileHandle.standardError.write(Data("launchd plist not found at \(Paths.launchdPlist.path) — run `gh-wallpaper` to install it.\n".utf8))
+            return 1
+        }
+        return launchctl("bootstrap", "gui/\(getuid())", Paths.launchdPlist.path)
+    }
+
+    private static func runDisplays() -> Int32 {
+        let displays = DisplayEnumerator.all()
+        print("connected displays:")
+        for d in displays {
+            print("  \(d.uuid)  \(d.widthPx)×\(d.heightPx)")
+        }
+        let config = try? ConfigStore.read()
+        if let mode = config?.displays {
+            print("\ncurrent setting: \(mode.serialized)")
+        }
+        print("(set via `gh-wallpaper` wizard; v0.1 always renders to all displays)")
+        return 0
+    }
+
+    private static func runDiagnose() -> Int32 {
+        let config = try? ConfigStore.read()
+        let state = StateStore.read()
+        let resvgPath: String = (try? Rasterizer().description) ?? "(rasterizer init failed — `brew install resvg`)"
+
+        print("gh-wallpaper diagnose")
+        print("─────────────────────")
+        print("config: \(ConfigStore.exists() ? Paths.configFile.path : "(not set up — run `gh-wallpaper`)")")
+        if let c = config {
+            print("  username: \(c.username)")
+            print("  theme: \(c.themeID)")
+            print("  displays: \(c.displays.serialized)")
+        }
+        print("state:")
+        if let last = state.lastRefreshAt {
+            print("  last refresh: \(ISO8601DateFormatter().string(from: last))")
+        } else {
+            print("  last refresh: (none)")
+        }
+        print("  consecutive failures: \(state.consecutiveFailures)")
+        if let err = state.lastError { print("  last error: \(err)") }
+        print("rasterizer: \(resvgPath)")
+        print("launchd plist: \(FileManager.default.fileExists(atPath: Paths.launchdPlist.path) ? "installed" : "not installed")")
+        print("displays: \(DisplayEnumerator.all().count)")
+        print("log: \(Paths.logFile.path)")
+        return 0
+    }
+
+    private static func runUninstall() -> Int32 {
+        print("uninstalling gh-wallpaper…")
+
+        // 1. Unload launchd
+        _ = launchctl("bootout", "gui/\(getuid())/\(Paths.launchdLabel)")
+        try? FileManager.default.removeItem(at: Paths.launchdPlist)
+
+        // 2. Restore previous wallpaper
+        do {
+            let cr = CaptureRestore()
+            let results = try cr.restore()
+            for r in results {
+                print("  \(r.displayUUID): \(r.action)")
+            }
+            try cr.clear()
+        } catch {
+            print("  (restore step had an issue: \(error) — continuing)")
+        }
+
+        // 3. Remove support dir
+        try? FileManager.default.removeItem(at: Paths.supportDir)
+
+        print("✓ uninstalled.")
+        return 0
+    }
+
+    // MARK: - Render helper
+
+    private static func renderOneShot(username: String, theme: Theme, setWallpaper: Bool) async -> Int32 {
+        do {
+            let displays = DisplayEnumerator.all()
+            guard !displays.isEmpty else {
+                FileHandle.standardError.write(Data("no displays detected\n".utf8))
+                return 1
+            }
+            let scraper = Scraper()
+            print("→ fetching contributions for @\(username)…")
+            let calendar = try await scraper.fetch(username: username)
+            print("→ parsed \(calendar.days.count) days")
+
+            try Paths.ensureSupportDir()
+            let rasterizer = try Rasterizer()
+            let setter = WallpaperSetter()
+            let builder = SVGBuilder()
+            for display in displays {
+                let canvas = SVGBuilder.Canvas(widthPx: display.widthPx, heightPx: display.heightPx)
+                let svg = builder.build(calendar: calendar, theme: theme, canvas: canvas)
+                let png = Paths.wallpaperPNG(displayUUID: display.uuid)
+                try rasterizer.rasterize(svg: svg, toPNG: png, widthPx: display.widthPx, heightPx: display.heightPx)
+                print("→ rendered \(png.lastPathComponent) (\(display.widthPx)×\(display.heightPx))")
+                if setWallpaper {
+                    try setter.set(pngURL: png, on: display)
+                }
+            }
+            if setWallpaper { print("done.") }
+            return 0
+        } catch {
+            FileHandle.standardError.write(Data("error: \(error)\n".utf8))
+            return 1
+        }
+    }
+
+    // MARK: - launchctl helper
+
+    @discardableResult
+    private static func launchctl(_ args: String...) -> Int32 {
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: "/bin/launchctl")
+        p.arguments = args
+        do {
+            try p.run()
+            p.waitUntilExit()
+            return p.terminationStatus
+        } catch {
+            FileHandle.standardError.write(Data("launchctl error: \(error)\n".utf8))
+            return 1
+        }
+    }
+
+    // MARK: - Help
+
+    private static func printHelp() -> Int32 {
+        print("""
+        gh-wallpaper — GitHub contribution heatmap as your macOS desktop wallpaper
+
+        Usage:
+          gh-wallpaper                         Run setup wizard (or re-run to reconfigure)
+          gh-wallpaper <username>              One-shot render for the given user
+          gh-wallpaper render [--user X]       Render PNG to disk without setting wallpaper
+                              [--theme T]
+          gh-wallpaper refresh                 Force an immediate refresh + set wallpaper
+          gh-wallpaper theme <id>              Switch theme (github-dark|github-light|paper|midnight|auto)
+          gh-wallpaper pause                   Stop the launchd agent
+          gh-wallpaper start                   Start the launchd agent
+          gh-wallpaper displays                List connected displays
+          gh-wallpaper diagnose                Print install state, last refresh, errors
+          gh-wallpaper uninstall               Full clean: launchd + config + restore prior wallpaper
+          gh-wallpaper --daemon                Run the daemon (used by launchd)
+
+        Privacy: scrapes the public profile only. No PAT, no auth, no telemetry.
+        """)
+        return 0
+    }
+}
+
+// MARK: - Helpers
+
+private extension Array {
+    subscript(safe i: Int) -> Element? {
+        return indices.contains(i) ? self[i] : nil
+    }
+}
+
+private extension Rasterizer {
+    var description: String { "ok (resvg available)" }
+}

@@ -174,9 +174,11 @@ public actor Daemon {
     /// failure tracker; success resets it. Never overwrites the on-disk PNG
     /// on failure.
     public func refresh() async {
-        // 1. Display
-        guard let display = DisplayEnumerator.main() else {
-            logger.error("no main display detected; skipping refresh")
+        // 1. Enumerate connected displays. v0.1 always renders to all displays;
+        //    a future config option can narrow this set.
+        let displays = DisplayEnumerator.all()
+        guard !displays.isEmpty else {
+            logger.error("no displays detected; skipping refresh")
             failureTracker.recordFailure()
             return
         }
@@ -192,32 +194,30 @@ public actor Daemon {
         }
         logger.debug("fetched \(calendar.days.count) days, contentHash=\(calendar.contentHash)")
 
-        // 3. Hash check
-        let canvas = SVGBuilder.Canvas(widthPx: display.widthPx, heightPx: display.heightPx)
+        // 3. Hash check (combines content + theme + per-display geometry +
+        //    system appearance). If nothing changed since last successful run,
+        //    we skip render + set entirely.
         let appearance = Self.systemAppearance()
-        let hash = renderHash(
+        let hash = combinedRenderHash(
             calendar: calendar,
             theme: config.theme,
-            canvas: canvas,
+            displays: displays,
             systemAppearance: appearance
         )
         if hash == lastRenderHash {
-            logger.info("no change, skip render (hash=\(hash.prefix(12))…)")
+            logger.info("no change, skip render (hash=\(hash.prefix(12))… displays=\(displays.count))")
             failureTracker.recordSuccess()
             return
         }
 
-        // 4. Render
+        // 4. Per-display render + set. We tolerate per-display failures: try every
+        //    display, count overall failure if any display fails, but only update
+        //    lastRenderHash if every display succeeded.
         guard let rasterizer = rasterizer else {
             logger.error("rasterizer unavailable; cannot render")
             failureTracker.recordFailure()
             return
         }
-        let svg = svgBuilder.build(calendar: calendar, theme: config.theme, canvas: canvas)
-
-        // 5. Rasterize to a temp file, then atomically promote to the canonical
-        //    path. This is what guarantees "never overwrite on failure": if
-        //    rasterize throws, we never touch the live PNG.
         let outputDir: URL
         do {
             outputDir = try Self.outputDirectory()
@@ -226,48 +226,84 @@ public actor Daemon {
             failureTracker.recordFailure()
             return
         }
-        let livePNG = outputDir.appendingPathComponent("wallpaper-\(display.uuid).png")
-        let tempPNG = outputDir.appendingPathComponent("wallpaper-\(display.uuid).new.png")
 
-        do {
-            try? FileManager.default.removeItem(at: tempPNG)
-            try rasterizer.rasterize(svg: svg, toPNG: tempPNG, widthPx: display.widthPx, heightPx: display.heightPx)
-        } catch {
-            logger.error("rasterize failed: \(error)")
-            try? FileManager.default.removeItem(at: tempPNG)
-            failureTracker.recordFailure()
-            return
-        }
+        var perDisplayFailed = false
+        for display in displays {
+            let canvas = SVGBuilder.Canvas(widthPx: display.widthPx, heightPx: display.heightPx)
+            let svg = svgBuilder.build(calendar: calendar, theme: config.theme, canvas: canvas)
+            let livePNG = outputDir.appendingPathComponent("wallpaper-\(display.uuid).png")
+            let tempPNG = outputDir.appendingPathComponent("wallpaper-\(display.uuid).new.png")
 
-        // Promote temp -> live atomically.
-        do {
-            if FileManager.default.fileExists(atPath: livePNG.path) {
-                _ = try FileManager.default.replaceItemAt(livePNG, withItemAt: tempPNG)
-            } else {
-                try FileManager.default.moveItem(at: tempPNG, to: livePNG)
+            // Rasterize to temp file (atomic promotion preserves last-good on failure).
+            do {
+                try? FileManager.default.removeItem(at: tempPNG)
+                try rasterizer.rasterize(
+                    svg: svg, toPNG: tempPNG,
+                    widthPx: display.widthPx, heightPx: display.heightPx
+                )
+            } catch {
+                logger.error("rasterize failed for display \(display.uuid): \(error)")
+                try? FileManager.default.removeItem(at: tempPNG)
+                perDisplayFailed = true
+                continue
             }
-        } catch {
-            logger.error("could not promote PNG: \(error)")
-            try? FileManager.default.removeItem(at: tempPNG)
-            failureTracker.recordFailure()
-            return
+
+            // Atomic promote temp -> live.
+            do {
+                if FileManager.default.fileExists(atPath: livePNG.path) {
+                    _ = try FileManager.default.replaceItemAt(livePNG, withItemAt: tempPNG)
+                } else {
+                    try FileManager.default.moveItem(at: tempPNG, to: livePNG)
+                }
+            } catch {
+                logger.error("could not promote PNG for display \(display.uuid): \(error)")
+                try? FileManager.default.removeItem(at: tempPNG)
+                perDisplayFailed = true
+                continue
+            }
+
+            // Set wallpaper on this display.
+            do {
+                try wallpaperSetter.set(pngURL: livePNG, on: display)
+            } catch {
+                logger.error("setDesktopImageURL failed for display \(display.uuid): \(error)")
+                perDisplayFailed = true
+                continue
+            }
         }
 
-        // 6. Set wallpaper.
-        do {
-            try wallpaperSetter.set(pngURL: livePNG, on: display)
-        } catch {
-            // The render succeeded; only the set failed. We don't roll back
-            // the PNG (it's a fresher last-good than what was there before).
-            // Count it as a failure so persistent set-failures still surface.
-            logger.error("setDesktopImageURL failed: \(error)")
+        if perDisplayFailed {
             failureTracker.recordFailure()
+            // Don't update lastRenderHash so next tick retries.
             return
         }
 
         lastRenderHash = hash
         failureTracker.recordSuccess()
-        logger.info("refresh complete (hash=\(hash.prefix(12))… display=\(display.widthPx)x\(display.heightPx))")
+        let geom = displays.map { "\($0.widthPx)x\($0.heightPx)" }.joined(separator: ",")
+        logger.info("refresh complete (hash=\(hash.prefix(12))… displays=\(displays.count) [\(geom)])")
+    }
+
+    /// Combines render-hash inputs across all connected displays so a display
+    /// reconfiguration (resolution change, monitor plug/unplug) invalidates the
+    /// last render and forces a re-render even if contribution data is unchanged.
+    private func combinedRenderHash(
+        calendar: ContributionCalendar,
+        theme: Theme,
+        displays: [DisplayInfo],
+        systemAppearance: String
+    ) -> String {
+        var hasher = Hasher()
+        hasher.combine(calendar.contentHash)
+        hasher.combine(theme.id)
+        hasher.combine(systemAppearance)
+        // Sort by UUID for stable hashing regardless of NSScreen ordering.
+        for d in displays.sorted(by: { $0.uuid < $1.uuid }) {
+            hasher.combine(d.uuid)
+            hasher.combine(d.widthPx)
+            hasher.combine(d.heightPx)
+        }
+        return String(hasher.finalize(), radix: 16)
     }
 
     private func fetchWithBackoff(username: String) async throws -> ContributionCalendar {
