@@ -55,6 +55,20 @@ public struct Scraper: Sendable {
             throw ScraperError.parseError("response was not valid UTF-8")
         }
         let days = try parser.parse(html: html)
-        return ContributionCalendar(username: username, days: days)
+        return ContributionCalendar(username: username, days: Self.dropFutureDays(days))
+    }
+
+    /// GitHub's anonymous HTML reports dates in UTC, which can include a cell
+    /// for "tomorrow" in the user's local tz once UTC rolls past local midnight.
+    /// That cell renders as an orphan in the otherwise-empty rightmost column.
+    /// Compare ISO date strings (lexicographic = chronological for YYYY-MM-DD)
+    /// against the user's local today so the comparison stays tz-correct.
+    static func dropFutureDays(_ days: [ContributionDay], now: Date = Date()) -> [ContributionDay] {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.timeZone = TimeZone.current
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        let todayISO = formatter.string(from: now)
+        return days.filter { $0.isoDate <= todayISO }
     }
 }
