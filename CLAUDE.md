@@ -1,0 +1,56 @@
+# Claude / agent guidance for this repo
+
+Quick orientation for future agents (or future you) walking in cold.
+
+## What this is
+
+`gh-wallpaper` — macOS desktop wallpaper that mirrors your GitHub contribution heatmap. Distributed via a personal Homebrew tap (`Numbatt/homebrew-tap`). Source is here; the tap repo is separate.
+
+Design + scope rationale: [`SPEC.md`](SPEC.md).
+
+## Architecture at a glance
+
+- **Library**: `Sources/GhWallpaper/` (the actual code — scraper, daemon, render, themes, config)
+- **CLI shell**: `Sources/GhWallpaperCLI/` (thin `@main` that dispatches into the library)
+- **Dev tool**: `Sources/SnapshotGen/` (regenerates committed SVG snapshots; NOT shipped to users)
+- **Tests**: `Tests/GhWallpaperTests/` — XCTest, requires full Xcode (Command Line Tools' XCTest is partial)
+- **Formula**: `Formula/gh-wallpaper.rb` mirrored to the tap repo
+
+## How to ship a release
+
+**Read [`docs/RELEASING.md`](docs/RELEASING.md) before doing any release work.** `/ship` only handles the git side — it does not tag a release, build bottles, or update the tap. The runbook covers the full Homebrew dance, the gotchas that have bitten us before, and a TL;DR command sequence.
+
+For the manual smoke checklist (separate from release): [`docs/RELEASE_TESTING.md`](docs/RELEASE_TESTING.md).
+
+## How to regenerate SVG snapshots
+
+After any intentional change to layout, glyph data, theme colors, or anything else that legitimately alters `SVGBuilder` output:
+
+```sh
+script/refresh-snapshots.sh   # wraps `swift run SnapshotGen`
+```
+
+Review the diff in your PR — that's the human signal for visual changes.
+
+## Local dev workflow
+
+```sh
+swift build                # debug, fast (~1-3 sec incremental)
+swift build -c release     # release, slow (~30 sec); what brew install runs
+./install.sh               # build release + install to /opt/homebrew/bin/gh-wallpaper
+                           # auto-codesigns post-copy to avoid SIGKILL on Sequoia/Tahoe
+```
+
+## Things to know before touching anything
+
+- **The two formula copies must stay in sync.** `Formula/gh-wallpaper.rb` in this repo and `Formula/gh-wallpaper.rb` in `Numbatt/homebrew-tap`. If you edit one, edit both. `script/update-bottle-block.sh` does the sync automatically.
+- **`com.apple.provenance` xattr → SIGKILL.** On Sequoia/Tahoe, copying a freshly-built ad-hoc-signed binary attaches a provenance xattr that makes amfi kill the process at launch (`zsh: killed gh-wallpaper`). The formula and `install.sh` both run `codesign --force --sign -` after copy to work around this. Don't remove that step.
+- **`launchctl bootstrap` race.** On Sequoia/Tahoe, `bootstrap` after `bootout` can return exit 5 if launchd hasn't fully torn down the prior PID. `LaunchAgent.install()` handles this with a 200ms sleep + retry.
+- **Default-username fallback was removed deliberately.** Don't add it back. If a user has no config, the daemon should log + skip (not silently render someone else's heatmap).
+- **`auto` theme is polled per refresh tick, not event-driven.** Per `SPEC.md` §234. Don't add an `AppleInterfaceThemeChangedNotification` observer; the polling design is intentional.
+
+## What's stale vs what's live
+
+- `image-1.png` was deleted in cleanup; if you see it referenced anywhere, that's stale.
+- "Wave 1/2/3", "M1 spike", "FROZEN INTERFACE" comments were swept in Phase 3. If they reappear, drop them.
+- The `worktree-agent-*` worktrees under `.claude/worktrees/` are Claude Code's tooling territory. Don't try to clean them.
