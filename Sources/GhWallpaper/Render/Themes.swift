@@ -2,7 +2,7 @@ import Foundation
 
 /// A theme defines all colors used in a wallpaper render.
 public struct Theme: Equatable, Hashable, Codable, Sendable {
-    public let id: String                  // "github-light" | "github-dark" | "paper" | "midnight"
+    public let id: String                  // "github-light" | "github-dark" | "paper" | "midnight" | "blossom" | "sunset" | "ocean" | "forest"
     public let background: String          // CSS color string, e.g. "#0d1117"
     public let backgroundIsGradient: Bool  // when true, `background` is an SVG <linearGradient>/<radialGradient> id reference
     public let cellRamp: [String]          // exactly 5 CSS color strings, level 0 -> 4
@@ -79,6 +79,68 @@ public enum Themes {
             """
     )
 
+    /// Blossom: soft pink background with a rich rose headline and a purple
+    /// 5-step cell ramp. Background and headline are different shades of pink
+    /// so the text stays readable against the pale wash; the purple ramp gives
+    /// the contributions enough saturation to pop off the pink.
+    public static let blossom = Theme(
+        id: "blossom",
+        background: "#ffe3f0",
+        cellRamp: [
+            "#ecd5fa",  // L0 — pale lavender, just barely off the pink bg
+            "#d4a3f7",  // L1 — light purple
+            "#a866e8",  // L2 — medium purple
+            "#7d2bd5",  // L3 — vivid purple
+            "#4a148c"   // L4 — deep indigo-purple
+        ],
+        headlineColor: "#c2185b"  // rich rose — strong contrast on pale pink
+    )
+
+    /// Sunset: warm cream background with a deep terracotta headline and an
+    /// amber→burnt-sienna cell ramp. Cozy warm-light counterpart to `paper`.
+    public static let sunset = Theme(
+        id: "sunset",
+        background: "#fff4e6",
+        cellRamp: [
+            "#fde9c8",  // L0 — pale buttery yellow
+            "#fbc77a",  // L1 — light amber
+            "#f59e3b",  // L2 — amber/orange
+            "#dd6b20",  // L3 — deep orange
+            "#9a3412"   // L4 — burnt sienna
+        ],
+        headlineColor: "#c2410c"  // deep terracotta
+    )
+
+    /// Ocean: pale aqua background with a deep slate headline and a
+    /// teal→navy cell ramp. Calm cool-light theme; pairs with sunset.
+    public static let ocean = Theme(
+        id: "ocean",
+        background: "#e6f4f4",
+        cellRamp: [
+            "#cfe8ec",  // L0 — pale teal, just barely off the bg
+            "#7fc7d4",  // L1 — light teal
+            "#3b9ab0",  // L2 — teal
+            "#1e5f7a",  // L3 — ocean blue
+            "#0a2d3f"   // L4 — deep navy
+        ],
+        headlineColor: "#0f3a4a"  // dark slate-blue
+    )
+
+    /// Forest: warm cream background with an espresso headline and a
+    /// sage→deep-emerald cell ramp. Earthy alternative to GitHub's neon greens.
+    public static let forest = Theme(
+        id: "forest",
+        background: "#faf6ec",
+        cellRamp: [
+            "#e0e6d4",  // L0 — pale sage
+            "#a8bf8a",  // L1 — light sage
+            "#6b8e4e",  // L2 — moss
+            "#3a6b2c",  // L3 — forest green
+            "#1a3d18"   // L4 — deep emerald
+        ],
+        headlineColor: "#3d2817"  // espresso brown
+    )
+
     /// Resolves the `auto` theme by reading the system appearance synchronously.
     /// Called per refresh tick by the daemon — no listener, no async.
     ///
@@ -98,6 +160,10 @@ public enum Themes {
         case "github-light": return githubLight
         case "paper":        return paper
         case "midnight":     return midnight
+        case "blossom":      return blossom
+        case "sunset":       return sunset
+        case "ocean":        return ocean
+        case "forest":       return forest
         case "auto":         return autoResolved()
         default: return nil
         }

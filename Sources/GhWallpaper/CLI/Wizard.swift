@@ -56,7 +56,8 @@ public struct Wizard {
     /// launchd agent. Best-effort: a step failing here doesn't roll back the
     /// saved config — the user can re-run the wizard or use individual CLI
     /// subcommands to recover.
-    private func activate(config: UserConfig) async throws {
+    private func activate(config initialConfig: UserConfig) async throws {
+        var config = initialConfig
         try Paths.ensureSupportDir()
 
         let allDisplays = DisplayEnumerator.all()
@@ -86,43 +87,56 @@ public struct Wizard {
         }
         print("  parsed \(calendar.days.count) days")
 
-        let theme = config.resolvedTheme()
         let rasterizer = try Rasterizer()
         let builder = SVGBuilder()
         let setter = WallpaperSetter()
         let primary = DisplayEnumerator.main() ?? allDisplays[0]
         let previewURL = Paths.supportDir.appendingPathComponent("preview.png")
-        let previewSVG = builder.build(
-            calendar: calendar,
-            theme: theme,
-            canvas: SVGBuilder.Canvas(widthPx: primary.widthPx, heightPx: primary.heightPx)
-        )
-        try rasterizer.rasterize(
-            svg: previewSVG,
-            toPNG: previewURL,
-            widthPx: primary.widthPx,
-            heightPx: primary.heightPx
-        )
 
-        print("""
+        // Preview/confirm loop: if the user rejects the rendered preview, we
+        // offer to pick a different theme and re-preview without re-fetching
+        // the calendar. They can iterate themes until they find one they like
+        // (or bail out, which preserves the saved config).
+        var confirmedTheme: Theme? = nil
+        previewLoop: while true {
+            let candidate = config.resolvedTheme()
+            let previewSVG = builder.build(
+                calendar: calendar,
+                theme: candidate,
+                canvas: SVGBuilder.Canvas(widthPx: primary.widthPx, heightPx: primary.heightPx)
+            )
+            try rasterizer.rasterize(
+                svg: previewSVG,
+                toPNG: previewURL,
+                widthPx: primary.widthPx,
+                heightPx: primary.heightPx
+            )
 
-        Next: I'll open the rendered wallpaper in Preview so you can see what it'll
-        look like before applying it. Close the preview when you're done and come
-        back here to confirm.
-        """)
-        print("Press Enter to open the preview…", terminator: "")
-        _ = readLine()
-        openInPreview(previewURL)
+            print("""
 
-        let confirmed: Bool = askYesNo(
-            prompt: "Set as your wallpaper now?",
-            defaultYes: true
-        )
-        if !confirmed {
-            print("\nconfig saved. Run `gh-wallpaper start` to enable the background daemon when ready.")
-            try? FileManager.default.removeItem(at: previewURL)
-            return
+            Next: I'll open the rendered wallpaper in Preview so you can see what it'll
+            look like before applying it. Close the preview when you're done and come
+            back here to confirm.
+            """)
+            print("Press Enter to open the preview…", terminator: "")
+            _ = readLine()
+            openInPreview(previewURL)
+
+            if askYesNo(prompt: "Set as your wallpaper now?", defaultYes: true) {
+                confirmedTheme = candidate
+                break previewLoop
+            }
+
+            if !askYesNo(prompt: "Want to try a different theme?", defaultYes: false) {
+                print("\nconfig saved. Run `gh-wallpaper start` to enable the background daemon when ready.")
+                try? FileManager.default.removeItem(at: previewURL)
+                return
+            }
+
+            config.themeID = pickTheme(existing: config.themeID)
+            try ConfigStore.write(config)
         }
+        guard let theme = confirmedTheme else { return }
 
         // Render + set per target display, then register launchd.
         let targetDisplays = config.displays.filter(allDisplays)
@@ -170,6 +184,10 @@ public struct Wizard {
             ("github-light", "github-light"),
             ("midnight", "midnight"),
             ("paper", "paper"),
+            ("blossom", "blossom"),
+            ("sunset", "sunset"),
+            ("ocean", "ocean"),
+            ("forest", "forest"),
         ]
         print("\nThemes:")
         for (i, choice) in choices.enumerated() {

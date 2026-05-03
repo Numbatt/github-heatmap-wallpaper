@@ -43,7 +43,7 @@ It'll ask for your GitHub username, theme, and which displays to use; preview th
 
 ## Themes
 
-Four themes ship plus an `auto` mode that follows your macOS appearance setting:
+Eight themes ship plus an `auto` mode that follows your macOS appearance setting:
 
 <table>
   <tr>
@@ -54,6 +54,14 @@ Four themes ship plus an `auto` mode that follows your macOS appearance setting:
     <td align="center"><b>paper</b><br><img src="images/torvalds-paper.png" alt="paper theme — torvalds's contribution heatmap in deep navy on cream" /></td>
     <td align="center"><b>midnight</b><br><img src="images/torvalds-midnight.png" alt="midnight theme — torvalds's contribution heatmap on a blue-purple gradient" /></td>
   </tr>
+  <tr>
+    <td align="center"><b>blossom</b><br><img src="images/torvalds-blossom.png" alt="blossom theme — torvalds's contribution heatmap in purple on pastel pink" /></td>
+    <td align="center"><b>sunset</b><br><img src="images/torvalds-sunset.png" alt="sunset theme — torvalds's contribution heatmap in amber on warm cream" /></td>
+  </tr>
+  <tr>
+    <td align="center"><b>ocean</b><br><img src="images/torvalds-ocean.png" alt="ocean theme — torvalds's contribution heatmap in teal on pale aqua" /></td>
+    <td align="center"><b>forest</b><br><img src="images/torvalds-forest.png" alt="forest theme — torvalds's contribution heatmap in moss-green on warm cream" /></td>
+  </tr>
 </table>
 
 - `auto` — sync with system appearance (default; switches between `github-light` and `github-dark` based on macOS Light/Dark Mode).
@@ -61,6 +69,10 @@ Four themes ship plus an `auto` mode that follows your macOS appearance setting:
 - `github-light` — classic green-on-white.
 - `midnight` — deep blue-purple gradient with a custom green ramp.
 - `paper` — single-ink deep navy on textured off-white.
+- `blossom` — purple ramp on pastel pink, rich rose headline.
+- `sunset` — amber→burnt-sienna ramp on warm cream, terracotta headline.
+- `ocean` — teal→navy ramp on pale aqua, slate headline.
+- `forest` — sage→deep-emerald ramp on warm cream, espresso headline.
 
 Switch any time:
 

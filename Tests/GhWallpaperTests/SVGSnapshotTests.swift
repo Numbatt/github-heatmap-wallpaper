@@ -27,6 +27,10 @@ final class SVGSnapshotTests: XCTestCase {
         ("github-light", Themes.githubLight),
         ("paper", Themes.paper),
         ("midnight", Themes.midnight),
+        ("blossom", Themes.blossom),
+        ("sunset", Themes.sunset),
+        ("ocean", Themes.ocean),
+        ("forest", Themes.forest),
     ]
 
     private static let fixtures = ["active", "sparse", "empty"]
