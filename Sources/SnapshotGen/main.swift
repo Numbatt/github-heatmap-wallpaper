@@ -32,6 +32,7 @@ let themes: [(label: String, theme: Theme)] = [
     ("sunset", Themes.sunset),
     ("ocean", Themes.ocean),
     ("forest", Themes.forest),
+    ("catppuccin-frappe", Themes.catppuccinFrappe),
 ]
 let canvases = [
     CanvasSpec(label: "2880x1800", width: 2880, height: 1800),  // 14" MBP at retina

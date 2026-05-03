@@ -188,6 +188,7 @@ public struct Wizard {
             ("sunset", "sunset"),
             ("ocean", "ocean"),
             ("forest", "forest"),
+            ("catppuccin-frappe", "catppuccin-frappe"),
         ]
         print("\nThemes:")
         for (i, choice) in choices.enumerated() {

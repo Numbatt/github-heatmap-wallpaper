@@ -31,6 +31,7 @@ final class SVGSnapshotTests: XCTestCase {
         ("sunset", Themes.sunset),
         ("ocean", Themes.ocean),
         ("forest", Themes.forest),
+        ("catppuccin-frappe", Themes.catppuccinFrappe),
     ]
 
     private static let fixtures = ["active", "sparse", "empty"]

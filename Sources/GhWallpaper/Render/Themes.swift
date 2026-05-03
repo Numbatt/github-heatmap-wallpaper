@@ -2,7 +2,7 @@ import Foundation
 
 /// A theme defines all colors used in a wallpaper render.
 public struct Theme: Equatable, Hashable, Codable, Sendable {
-    public let id: String                  // "github-light" | "github-dark" | "paper" | "midnight" | "blossom" | "sunset" | "ocean" | "forest"
+    public let id: String                  // "github-light" | "github-dark" | "paper" | "midnight" | "blossom" | "sunset" | "ocean" | "forest" | "catppuccin-frappe"
     public let background: String          // CSS color string, e.g. "#0d1117"
     public let backgroundIsGradient: Bool  // when true, `background` is an SVG <linearGradient>/<radialGradient> id reference
     public let cellRamp: [String]          // exactly 5 CSS color strings, level 0 -> 4
@@ -141,6 +141,25 @@ public enum Themes {
         headlineColor: "#3d2817"  // espresso brown
     )
 
+    /// Catppuccin Frappé: ported from the Catppuccin palette, with slot
+    /// assignments matching how Hesam Panahi (who suggested the theme) uses
+    /// Frappé on his own site — pink for headings, green for active elements.
+    /// L1 and L4 are synthesized to bridge surface0 → green and to anchor a
+    /// peak above Frappé's two published greens; the published palette only
+    /// ships one base green.
+    public static let catppuccinFrappe = Theme(
+        id: "catppuccin-frappe",
+        background: "#303446",  // base
+        cellRamp: [
+            "#414559",  // L0 — surface0
+            "#5d7a52",  // L1 — synth dark green (bridge surface0 → green)
+            "#a6d189",  // L2 — green
+            "#b8e19d",  // L3 — light green
+            "#cdf09d"   // L4 — synth bright green (peak anchor)
+        ],
+        headlineColor: "#f4b8e4"  // pink
+    )
+
     /// Resolves the `auto` theme by reading the system appearance synchronously.
     /// Called per refresh tick by the daemon — no listener, no async.
     ///
@@ -164,6 +183,7 @@ public enum Themes {
         case "sunset":       return sunset
         case "ocean":        return ocean
         case "forest":       return forest
+        case "catppuccin-frappe": return catppuccinFrappe
         case "auto":         return autoResolved()
         default: return nil
         }

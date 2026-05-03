@@ -75,7 +75,7 @@ public enum Commands {
         if let themeID {
             guard let resolved = Themes.byId(themeID) else {
                 FileHandle.standardError.write(Data(
-                    "unknown theme: \(themeID) (valid: github-dark, github-light, paper, midnight, blossom, sunset, ocean, forest, auto)\n".utf8
+                    "unknown theme: \(themeID) (valid: github-dark, github-light, paper, midnight, blossom, sunset, ocean, forest, catppuccin-frappe, auto)\n".utf8
                 ))
                 return 1
             }
@@ -105,7 +105,7 @@ public enum Commands {
 
     private static func runTheme(args: [String]) async -> Int32 {
         guard let id = args.first else {
-            FileHandle.standardError.write(Data("usage: gh-wallpaper theme <github-dark|github-light|paper|midnight|blossom|sunset|ocean|forest|auto>\n".utf8))
+            FileHandle.standardError.write(Data("usage: gh-wallpaper theme <github-dark|github-light|paper|midnight|blossom|sunset|ocean|forest|catppuccin-frappe|auto>\n".utf8))
             return 1
         }
         guard Themes.byId(id) != nil else {

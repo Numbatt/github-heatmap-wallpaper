@@ -7,6 +7,7 @@ final class ThemesTests: XCTestCase {
         XCTAssertEqual(Themes.githubLight.cellRamp.count, 5)
         XCTAssertEqual(Themes.paper.cellRamp.count, 5)
         XCTAssertEqual(Themes.midnight.cellRamp.count, 5)
+        XCTAssertEqual(Themes.catppuccinFrappe.cellRamp.count, 5)
     }
 
     func testByIdResolvesAllShippingThemes() {
@@ -14,6 +15,7 @@ final class ThemesTests: XCTestCase {
         XCTAssertNotNil(Themes.byId("github-dark"))
         XCTAssertNotNil(Themes.byId("paper"))
         XCTAssertNotNil(Themes.byId("midnight"))
+        XCTAssertNotNil(Themes.byId("catppuccin-frappe"))
         XCTAssertNotNil(Themes.byId("auto"))
         XCTAssertNil(Themes.byId("nope"))
     }
