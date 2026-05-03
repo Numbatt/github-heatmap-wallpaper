@@ -296,7 +296,9 @@ public enum Commands {
           gh-wallpaper render [--user X]       Render PNG to disk without setting wallpaper
                               [--theme T]
           gh-wallpaper refresh                 Force an immediate refresh + set wallpaper
-          gh-wallpaper theme <id>              Switch theme (github-dark|github-light|paper|midnight|auto)
+          gh-wallpaper theme <id>              Switch theme. Valid ids:
+                                                 github-dark, github-light, paper, midnight,
+                                                 blossom, sunset, ocean, forest, auto
           gh-wallpaper pause                   Stop the launchd agent
           gh-wallpaper start                   Start the launchd agent
           gh-wallpaper displays                List connected displays
