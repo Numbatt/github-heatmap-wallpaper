@@ -28,6 +28,10 @@ let themes: [(label: String, theme: Theme)] = [
     ("github-light", Themes.githubLight),
     ("paper", Themes.paper),
     ("midnight", Themes.midnight),
+    ("blossom", Themes.blossom),
+    ("sunset", Themes.sunset),
+    ("ocean", Themes.ocean),
+    ("forest", Themes.forest),
 ]
 let canvases = [
     CanvasSpec(label: "2880x1800", width: 2880, height: 1800),  // 14" MBP at retina
@@ -65,3 +69,38 @@ for fixture in fixtures {
 FileHandle.standardError.write(Data(
     "wrote \(written) snapshots to \(snapshotsDir)\n".utf8
 ))
+
+// Optional: regenerate the README gallery PNGs (images/torvalds-<theme>.png).
+// Hits github.com to fetch torvalds's contribution graph, so it's gated
+// behind an env var to keep the default `swift run SnapshotGen` offline.
+//
+//   GENERATE_GALLERY=1 swift run SnapshotGen
+//   GENERATE_GALLERY=1 GALLERY_THEMES=blossom,sunset,ocean,forest swift run SnapshotGen
+//
+// Requires `resvg` on PATH (same as the binary). Output dimensions match
+// the existing gallery (3420×2214) so the README table stays consistent.
+if ProcessInfo.processInfo.environment["GENERATE_GALLERY"] == "1" {
+    let galleryDir = "images"
+    try fm.createDirectory(atPath: galleryDir, withIntermediateDirectories: true)
+    let only = ProcessInfo.processInfo.environment["GALLERY_THEMES"]
+        .map { Set($0.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) }) }
+    let galleryThemes = themes.filter { only?.contains($0.label) ?? true }
+
+    FileHandle.standardError.write(Data(
+        "→ fetching torvalds for gallery (\(galleryThemes.count) themes)…\n".utf8
+    ))
+    let calendar = try await Scraper().fetch(username: "torvalds")
+    FileHandle.standardError.write(Data(
+        "  parsed \(calendar.days.count) days\n".utf8
+    ))
+    let rasterizer = try Rasterizer()
+    let galleryCanvas = SVGBuilder.Canvas(widthPx: 3420, heightPx: 2214)
+    for (label, theme) in galleryThemes {
+        let svg = builder.build(calendar: calendar, theme: theme, canvas: galleryCanvas)
+        let outURL = URL(fileURLWithPath: "\(galleryDir)/torvalds-\(label).png")
+        try rasterizer.rasterize(svg: svg, toPNG: outURL, widthPx: 3420, heightPx: 2214)
+        FileHandle.standardError.write(Data(
+            "  wrote \(outURL.lastPathComponent)\n".utf8
+        ))
+    }
+}

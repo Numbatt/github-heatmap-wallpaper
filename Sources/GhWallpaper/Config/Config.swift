@@ -7,7 +7,7 @@ import Foundation
 /// nested tables, switch to a real TOML library.
 public struct UserConfig: Equatable, Codable, Sendable {
     public var username: String
-    public var themeID: String         // "github-light" | "github-dark" | "paper" | "midnight" | "auto"
+    public var themeID: String         // "github-light" | "github-dark" | "paper" | "midnight" | "blossom" | "sunset" | "ocean" | "forest" | "auto"
     public var displays: DisplayMode
     public var includePrivate: Bool    // not used in v0.1 (we scrape; profile setting controls it)
 
