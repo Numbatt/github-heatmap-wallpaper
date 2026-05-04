@@ -298,7 +298,8 @@ public enum Commands {
           gh-wallpaper refresh                 Force an immediate refresh + set wallpaper
           gh-wallpaper theme <id>              Switch theme. Valid ids:
                                                  github-dark, github-light, paper, midnight,
-                                                 blossom, sunset, ocean, forest, auto
+                                                 blossom, sunset, ocean, forest,
+                                                 catppuccin-frappe, auto
           gh-wallpaper pause                   Stop the launchd agent
           gh-wallpaper start                   Start the launchd agent
           gh-wallpaper displays                List connected displays
