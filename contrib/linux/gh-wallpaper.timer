@@ -1,0 +1,12 @@
+[Unit]
+Description=Refresh GitHub heatmap wallpaper hourly
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=1h
+Persistent=true
+RandomizedDelaySec=5min
+Unit=gh-wallpaper.service
+
+[Install]
+WantedBy=timers.target

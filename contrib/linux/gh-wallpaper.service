@@ -1,0 +1,19 @@
+[Unit]
+Description=Render GitHub contribution heatmap to PNG
+Documentation=https://github.com/Numbatt/github-heatmap-wallpaper/blob/main/contrib/linux/README.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# Override these via: systemctl --user edit gh-wallpaper.service
+# GH_USER is intentionally empty so a forgotten override fails fast and
+# loud rather than silently rendering someone else's heatmap.
+Environment=GH_USER=
+Environment=GH_THEME=github-dark
+Environment=GH_CANVAS=2560x1440
+Environment=GH_OUTPUT=%h/.cache/gh-wallpaper/heatmap.png
+ExecStart=%h/.local/bin/heatmap.sh --user ${GH_USER} --theme ${GH_THEME} --canvas ${GH_CANVAS} --output ${GH_OUTPUT}
+
+[Install]
+WantedBy=default.target

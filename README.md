@@ -163,11 +163,44 @@ If you want private contributions on the wallpaper, toggle GitHub's "Include pri
 
 ---
 
+## Linux (community recipe)
+
+The macOS app doesn't run on Linux — it's built on AppKit and launchd. But the heatmap render is portable enough that a ~180-line shell script (`curl` + `rsvg-convert`) plus a systemd user timer gets you the spirit of the project: your wallpaper is your GitHub heatmap, and it refreshes itself hourly.
+
+**What you get:** the 53×7 heatmap grid in 5 themes (`github-dark`, `github-light`, `catppuccin-mocha`, `dracula`, `tokyo-night`); a render-only systemd oneshot + hourly timer; per-DE wallpaper-setter snippets for GNOME, KDE Plasma 6, XFCE, Sway, Hyprland, and X11.
+
+**What you don't get:** the "DESIGN BUILD SHIP" headline (the heatmap is the iconic part — porting hand-designed glyphs to shell isn't worth the maintenance cost), custom JSON themes, image backgrounds, multi-display awareness, the visual editor, or any kind of support contract. This is a community recipe — best-effort.
+
+Quickstart (Debian/Ubuntu, GNOME):
+
+```sh
+sudo apt install -y curl librsvg2-bin
+git clone https://github.com/Numbatt/github-heatmap-wallpaper
+cd github-heatmap-wallpaper
+install -Dm755 contrib/linux/heatmap.sh                      ~/.local/bin/heatmap.sh
+install -Dm755 contrib/linux/examples/set-wallpaper-gnome.sh ~/.local/bin/set-wallpaper-gnome.sh
+install -Dm644 contrib/linux/gh-wallpaper.{service,timer}    ~/.config/systemd/user/
+systemctl --user edit gh-wallpaper.service
+# in the editor, paste:
+#   [Service]
+#   Environment=GH_USER=your-github-username
+#   ExecStartPost=%h/.local/bin/set-wallpaper-gnome.sh
+systemctl --user daemon-reload
+systemctl --user enable --now gh-wallpaper.timer
+```
+
+For KDE / XFCE / Sway / Hyprland / X11, see [`contrib/linux/README.md`](contrib/linux/README.md) — it has the per-DE walkthroughs, troubleshooting tips, and one important Wayland gotcha (don't run `swaybg` from a oneshot — see the contrib README for the right pattern).
+
+---
+
 ## Requirements
 
+**macOS app:**
 - macOS 14 (Sonoma) or newer
 - [`resvg`](https://github.com/RazrFalcon/resvg) on your `PATH` (`brew install resvg` — Homebrew installs this transitively)
 - If building from source: Swift 5.7+ (Apple's Command Line Tools are enough — `xcode-select --install`; no full Xcode required)
+
+**Linux recipe:** see [`contrib/linux/README.md`](contrib/linux/README.md). Just `curl` + `librsvg2-bin` (or your distro's equivalent) + systemd.
 
 ---
 
