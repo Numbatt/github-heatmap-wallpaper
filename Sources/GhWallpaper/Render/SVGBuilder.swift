@@ -70,11 +70,14 @@ public struct SVGBuilder: Sendable {
         // Image background (if set) draws on top of the solid/gradient fill,
         // then a translucent black overlay sits between the image and the
         // heatmap so the cells stay readable on busy photos. resvg renders
-        // SVG <image> natively; the href must be a file:// URL pointing at
-        // an absolute path (resolved by CustomThemes.resolvedImagePath).
+        // SVG <image> natively, but its loader silently rejects `file://`
+        // URLs (logs `'…' is not a path to an image` and renders nothing).
+        // Emit the plain absolute filesystem path instead — that's what
+        // resvg actually accepts. CustomThemes.resolvedImagePath already
+        // gives us an absolute path.
         if let imagePath = theme.backgroundImagePath, !imagePath.isEmpty {
             let escaped = escapeXMLAttribute(imagePath)
-            svg += #"  <image href="file://\#(escaped)" "#
+            svg += #"  <image href="\#(escaped)" "#
             svg += #"x="0" y="0" width="100%" height="100%" "#
             svg += #"preserveAspectRatio="xMidYMid slice"/>"# + "\n"
             let alpha = (theme.backgroundDimAlpha ?? 0.4).clamped01()

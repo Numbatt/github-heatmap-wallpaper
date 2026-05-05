@@ -2,13 +2,13 @@
 
 All notable changes to `gh-wallpaper` are recorded here. The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project follows semver.
 
-## [0.2.0] — unreleased
+## [0.2.0] — 2026-05-05
 
 ### Added
 - Five new built-in themes: `tokyo-night`, `dracula`, `nord`, `gruvbox-dark`, and `catppuccin-mocha`.
 - **Custom themes**: drop a JSON file in `~/Library/Application Support/gh-wallpaper/themes/`, then run `gh-wallpaper theme <id>`. Schema mirrors the built-in `Theme` struct (`id`, `background`, `cellRamp` [5 colors], `headlineColor`, optional `backgroundIsGradient` + `gradientSVG`). Validation rejects malformed files with a logged warning rather than crashing the daemon. See README for the schema.
 - **Visual theme editor** — opens a native macOS SwiftUI window with system color pickers (one per slot), a dim slider, an image-background picker, and a live preview that re-renders from the same SVG pipeline the daemon uses. Three entry points:
-  - `gh-wallpaper themes new <name>` — start from scratch (or `--from <id>` to seed from any existing theme).
+  - `gh-wallpaper themes new <name>` — start from scratch; the editor's "Apply defaults from…" menu can paste any existing theme's palette onto the draft live.
   - `gh-wallpaper theme <id> --edit` — edit a custom in place, or fork a built-in (built-ins force a rename on save since they're immutable).
   - The Save button label updates as you type ("Save as custom theme 'my-theme'") so the commit moment is unambiguous. **Save & apply** applies the new theme as your wallpaper immediately. The editor only loads on these subcommands; the daemon stays headless.
 - New `gh-wallpaper themes <verb>` CRUD: `delete <name>`, `export <name>` (JSON to stdout, works for built-ins too), `import` (read JSON from stdin). `themes export dracula > my-dracula.json` then editing + `themes import < my-dracula.json` is the full share-a-theme loop.

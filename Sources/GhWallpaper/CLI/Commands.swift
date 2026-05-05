@@ -35,6 +35,49 @@ public enum Commands {
         }
     }
 
+    // MARK: - Sync editor dispatch
+    //
+    // The editor (`themes new`, `theme … --edit`) drives `NSApplication.run()`
+    // on the main thread. Mixing that with `await MainActor.run { … }` from
+    // an async-main Swift Concurrency context starves both `DispatchQueue.main`
+    // and MainActor continuations — preview never renders, post-editor
+    // wallpaper apply never fires. So the entrypoint detects these
+    // invocations up front and runs them on a fully synchronous main thread.
+
+    /// Returns `true` for the two argv shapes that open the SwiftUI editor:
+    /// `themes new …` and `theme <id> --edit`. Verbose flags are tolerated.
+    public static func isEditorInvocation(_ argv: [String]) -> Bool {
+        let stripped = argv.dropFirst().filter { $0 != "-v" && $0 != "--verbose" }
+        guard let first = stripped.first else { return false }
+        let rest = stripped.dropFirst()
+        switch first {
+        case "theme":  return rest.contains("--edit")
+        case "themes": return rest.first == "new"
+        default:       return false
+        }
+    }
+
+    /// Synchronous dispatch for editor invocations. Caller must already be
+    /// on the OS main thread (the `@main` entrypoint guarantees this).
+    public static func dispatchEditorSync(_ argv: [String]) -> Int32 {
+        var args = Array(argv.dropFirst())
+        if let idx = args.firstIndex(where: { $0 == "-v" || $0 == "--verbose" }) {
+            args.remove(at: idx)
+            Logger.shared.consoleMirror = .debug
+        }
+        guard let first = args.first else { return 1 }
+        let rest = Array(args.dropFirst())
+        switch first {
+        case "theme":
+            return runThemeEditSync(args: rest)
+        case "themes":
+            // isEditorInvocation already gated this on rest.first == "new".
+            return runThemesNewSync(args: Array(rest.dropFirst()))
+        default:
+            return 1
+        }
+    }
+
     // MARK: - Subcommands
 
     private static func runWizard() async -> Int32 {
@@ -106,17 +149,14 @@ public enum Commands {
 
     private static let builtinThemeIDs: Set<String> = Set(Themes.builtins.map(\.id) + ["auto"])
 
-    /// `theme <id>` applies a theme. `theme <id> --edit` opens the editor:
-    ///   - if `<id>` is a built-in, the editor is seeded from it and the
-    ///     user must pick a new name to save (built-ins are immutable);
-    ///   - if `<id>` is a custom, the editor edits it in place;
-    ///   - if `<id>` doesn't exist, the command errors and points the
-    ///     user at `gh-wallpaper themes new <id>`.
+    /// `theme <id>` applies a theme. The `--edit` form is dispatched
+    /// separately by `dispatchEditorSync` because the editor must run
+    /// fully synchronously on the main thread (mixing
+    /// `NSApplication.run()` with `await MainActor.run` starves the
+    /// SwiftUI preview render and the post-editor wallpaper apply).
     private static func runTheme(args: [String]) async -> Int32 {
         var themeID: String? = nil
-        var edit = false
         for a in args {
-            if a == "--edit" { edit = true; continue }
             if themeID == nil { themeID = a; continue }
             FileHandle.standardError.write(Data(
                 "unexpected argument: \(a)\nusage: gh-wallpaper theme <id> [--edit]\n".utf8
@@ -128,23 +168,6 @@ public enum Commands {
                 "usage: gh-wallpaper theme <id> [--edit]  (run `gh-wallpaper themes` to list available themes)\n".utf8
             ))
             return 1
-        }
-
-        if edit {
-            // Seed comes from whatever this id resolves to. Built-ins get
-            // forked (mustRename); existing customs edit in place.
-            guard let seed = Themes.byId(id) else {
-                FileHandle.standardError.write(Data(
-                    "no such theme '\(id)'. Try `gh-wallpaper themes new \(id)` to create one.\n".utf8
-                ))
-                return 1
-            }
-            let isBuiltin = builtinThemeIDs.contains(id)
-            return await runEditor(
-                seed: seed,
-                initialName: isBuiltin ? id : id,
-                mustRename: isBuiltin
-            )
         }
 
         // Plain apply.
@@ -171,14 +194,82 @@ public enum Commands {
         }
     }
 
-    /// Shared editor entrypoint used by `theme <id> --edit` and
-    /// `themes new <name>`. Opens the SwiftUI window, persists the result,
-    /// and (when the user clicks Save & Apply) writes the new id to config
-    /// and refreshes the wallpaper.
-    private static func runEditor(seed: Theme, initialName: String, mustRename: Bool) async -> Int32 {
-        let outcome = await MainActor.run {
-            ThemeEditor.run(seed: seed, themeName: initialName, mustRename: mustRename)
+    // MARK: - Sync editor handlers (called from dispatchEditorSync)
+
+    private static func runThemeEditSync(args: [String]) -> Int32 {
+        var themeID: String? = nil
+        for a in args {
+            if a == "--edit" { continue }
+            if themeID == nil { themeID = a; continue }
+            FileHandle.standardError.write(Data(
+                "unexpected argument: \(a)\nusage: gh-wallpaper theme <id> [--edit]\n".utf8
+            ))
+            return 1
         }
+        guard let id = themeID else {
+            FileHandle.standardError.write(Data(
+                "usage: gh-wallpaper theme <id> [--edit]  (run `gh-wallpaper themes` to list available themes)\n".utf8
+            ))
+            return 1
+        }
+        // Seed comes from whatever this id resolves to. Built-ins get
+        // forked (mustRename); existing customs edit in place.
+        guard let seed = Themes.byId(id) else {
+            FileHandle.standardError.write(Data(
+                "no such theme '\(id)'. Try `gh-wallpaper themes new \(id)` to create one.\n".utf8
+            ))
+            return 1
+        }
+        let isBuiltin = builtinThemeIDs.contains(id)
+        return runEditorSync(seed: seed, initialName: id, mustRename: isBuiltin)
+    }
+
+    private static func runThemesNewSync(args: [String]) -> Int32 {
+        var name: String? = nil
+        for a in args {
+            if name == nil { name = a; continue }
+            FileHandle.standardError.write(Data("unexpected argument: \(a)\n".utf8))
+            return 1
+        }
+        guard let n = name, !n.isEmpty else {
+            FileHandle.standardError.write(Data(
+                "usage: gh-wallpaper themes new <name>\n".utf8
+            ))
+            return 1
+        }
+        if builtinThemeIDs.contains(n) {
+            FileHandle.standardError.write(Data(
+                "'\(n)' is a built-in theme. Pick a different name (e.g. 'my-\(n)') — built-ins are immutable.\n".utf8
+            ))
+            return 1
+        }
+        if CustomThemes.shared.find(id: n) != nil {
+            FileHandle.standardError.write(Data(
+                "theme '\(n)' already exists. Use `gh-wallpaper theme \(n) --edit` to edit it, or `themes delete \(n)` first.\n".utf8
+            ))
+            return 1
+        }
+
+        // Seed: current config theme if any, else github-dark. Users
+        // re-seed live from the editor's "Apply defaults from…" menu.
+        let seed: Theme
+        if let cfg = try? ConfigStore.read() {
+            seed = cfg.resolvedTheme()
+        } else {
+            seed = Themes.githubDark
+        }
+
+        return runEditorSync(seed: seed, initialName: n, mustRename: false)
+    }
+
+    /// Synchronous twin of the deleted async `runEditor`. Opens the SwiftUI
+    /// window via `ThemeEditor.runOnMainThread` (which blocks until close),
+    /// then — when the user hit Save & Apply — bridges back into the
+    /// existing async `runRefreshOnce` via a semaphore. The bridge is safe
+    /// here because we're past `app.run()` and Swift Concurrency is no
+    /// longer fighting the AppKit run loop.
+    private static func runEditorSync(seed: Theme, initialName: String, mustRename: Bool) -> Int32 {
+        let outcome = ThemeEditor.runOnMainThread(seed: seed, themeName: initialName, mustRename: mustRename)
         switch outcome {
         case .cancelled:
             print("(cancelled)")
@@ -196,7 +287,8 @@ public enum Commands {
                 do {
                     try ConfigStore.write(config)
                     print("→ applying \(id)…")
-                    return await runRefreshOnce(config: config)
+                    let frozen = config
+                    return runAsyncSync { await runRefreshOnce(config: frozen) }
                 } catch {
                     FileHandle.standardError.write(Data("could not save config: \(error)\n".utf8))
                     return 1
@@ -206,13 +298,31 @@ public enum Commands {
         }
     }
 
+    /// Run an async operation to completion from a sync context, blocking
+    /// the calling thread until it finishes. Used by `runEditorSync` to
+    /// reuse the existing async refresh pipeline.
+    private static func runAsyncSync(_ op: @escaping @Sendable () async -> Int32) -> Int32 {
+        let semaphore = DispatchSemaphore(value: 0)
+        let box = ResultBox()
+        Task.detached {
+            box.value = await op()
+            semaphore.signal()
+        }
+        semaphore.wait()
+        return box.value
+    }
+
+    private final class ResultBox: @unchecked Sendable {
+        var value: Int32 = 1
+    }
+
     /// `themes` (no verb) lists built-in + custom themes.
-    /// `themes <verb>` dispatches to CRUD actions: new / delete / export / import.
+    /// `themes <verb>` dispatches to CRUD actions: delete / export / import.
+    /// (`themes new` is handled by `dispatchEditorSync` — see `runTheme` for why.)
     private static func runThemes(args: [String]) async -> Int32 {
         guard let verb = args.first else { return runThemesList() }
         let rest = Array(args.dropFirst())
         switch verb {
-        case "new":     return await runThemesNew(args: rest)
         case "delete":  return runThemesDelete(args: rest)
         case "export":  return runThemesExport(args: rest)
         case "import":  return runThemesImport()
@@ -247,68 +357,6 @@ public enum Commands {
             print("\nTip: edit any of these with `gh-wallpaper theme <name> --edit`.")
         }
         return 0
-    }
-
-    private static func runThemesNew(args: [String]) async -> Int32 {
-        var name: String? = nil
-        var fromID: String? = nil
-        var i = 0
-        while i < args.count {
-            let a = args[i]
-            if a == "--from" {
-                guard let v = args[safe: i + 1] else {
-                    FileHandle.standardError.write(Data("--from requires a theme id\n".utf8))
-                    return 1
-                }
-                fromID = v
-                i += 2
-                continue
-            }
-            if name == nil {
-                name = a
-                i += 1
-                continue
-            }
-            FileHandle.standardError.write(Data("unexpected argument: \(a)\n".utf8))
-            return 1
-        }
-        guard let n = name, !n.isEmpty else {
-            FileHandle.standardError.write(Data(
-                "usage: gh-wallpaper themes new <name> [--from <id>]\n".utf8
-            ))
-            return 1
-        }
-        if builtinThemeIDs.contains(n) {
-            FileHandle.standardError.write(Data(
-                "'\(n)' is a built-in theme. Pick a different name (e.g. 'my-\(n)') — built-ins are immutable.\n".utf8
-            ))
-            return 1
-        }
-        if CustomThemes.shared.find(id: n) != nil {
-            FileHandle.standardError.write(Data(
-                "theme '\(n)' already exists. Use `gh-wallpaper theme \(n) --edit` to edit it, or `themes delete \(n)` first.\n".utf8
-            ))
-            return 1
-        }
-
-        // Seed precedence: --from <id> wins; else current config theme;
-        // else github-dark.
-        let seed: Theme
-        if let fromID = fromID {
-            guard let t = Themes.byId(fromID) else {
-                FileHandle.standardError.write(Data(
-                    "--from references unknown theme '\(fromID)'\n".utf8
-                ))
-                return 1
-            }
-            seed = t
-        } else if let cfg = try? ConfigStore.read() {
-            seed = cfg.resolvedTheme()
-        } else {
-            seed = Themes.githubDark
-        }
-
-        return await runEditor(seed: seed, initialName: n, mustRename: false)
     }
 
     private static func runThemesDelete(args: [String]) -> Int32 {
@@ -592,7 +640,8 @@ public enum Commands {
                                                customs edit in place.
           gh-wallpaper themes                  List built-in + custom themes
           gh-wallpaper themes new <name>       Create a new custom theme in the editor
-                              [--from <id>]    (optionally seed from any existing theme)
+                                               (use the "Apply defaults from…" menu to seed
+                                               from any existing theme)
           gh-wallpaper themes delete <name>    Remove a custom theme + its image
           gh-wallpaper themes export <name>    Print theme JSON to stdout (works for built-ins)
           gh-wallpaper themes import           Read theme JSON from stdin and save it

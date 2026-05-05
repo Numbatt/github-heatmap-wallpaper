@@ -14,6 +14,19 @@ public enum ThemeEditor {
         case cancelled
     }
 
+    /// Sync entry for callers already on the OS main thread (the CLI's
+    /// `dispatchEditorSync` path). Bridges into the `@MainActor` impl
+    /// without going through `await MainActor.run` — that wrapper, when
+    /// it ends up calling `NSApplication.run()`, starves both
+    /// `DispatchQueue.main` and MainActor continuations and breaks the
+    /// live preview + the post-editor wallpaper apply.
+    public static func runOnMainThread(seed: Theme, themeName: String, mustRename: Bool = false) -> Outcome {
+        precondition(Thread.isMainThread, "ThemeEditor.runOnMainThread must be called from the main thread")
+        return MainActor.assumeIsolated {
+            run(seed: seed, themeName: themeName, mustRename: mustRename)
+        }
+    }
+
     /// Opens the editor window and blocks until the user closes it.
     /// Returns the outcome so the caller can decide whether to refresh
     /// the wallpaper, write to config, etc.
@@ -31,7 +44,7 @@ public enum ThemeEditor {
         let view = ThemeEditorView(model: model)
 
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 1100, height: 880),
+            contentRect: NSRect(x: 0, y: 0, width: 1100, height: 960),
             styleMask: [.titled, .closable, .resizable],
             backing: .buffered,
             defer: false
@@ -243,8 +256,8 @@ final class ThemeEditorModel: ObservableObject {
 
     /// Builds a `Theme` from the model. `forPreview=true` puts the
     /// absolute source path in `backgroundImagePath` so SVGBuilder can
-    /// emit a usable `file://` href; `forPreview=false` substitutes the
-    /// post-save relative path so the JSON written to disk is portable.
+    /// emit a usable href; `forPreview=false` substitutes the post-save
+    /// relative path so the JSON written to disk is portable.
     func currentTheme(forPreview: Bool) -> Theme {
         let id = sanitizedID(themeName)
         let imagePath: String?
@@ -268,6 +281,51 @@ final class ThemeEditorModel: ObservableObject {
             backgroundImagePath: imagePath,
             backgroundDimAlpha: imagePath == nil ? nil : dimAlpha
         )
+    }
+
+    // MARK: - Preset application
+
+    /// Replaces the editable color fields (background, headline, ramp)
+    /// with the values from `theme`. Leaves the theme name, image
+    /// background, and dim-overlay slider alone — those are independent
+    /// of the color preset. For gradient-backed themes (e.g. `midnight`)
+    /// the editor's solid-color swatch can't show a gradient, so we pull
+    /// the gradient's last `stop-color` out of the embedded `<defs>` and
+    /// use that as a representative solid — for radial gradients the
+    /// outer stop is the color most readers associate with the theme.
+    func applyDefaults(from theme: Theme) {
+        if !theme.backgroundIsGradient, let c = Color(hex: theme.background) {
+            background = c
+        } else if theme.backgroundIsGradient,
+                  let svg = theme.gradientSVG,
+                  let hex = Self.lastStopColor(in: svg),
+                  let c = Color(hex: hex) {
+            background = c
+        }
+        if let c = Color(hex: theme.headlineColor) {
+            headline = c
+        }
+        if theme.cellRamp.count == 5 {
+            ramp = theme.cellRamp.map { Color(hex: $0) ?? .gray }
+        }
+    }
+
+    /// Returns the last `stop-color="…"` value in a gradient SVG snippet,
+    /// or nil if none parse. Used as a solid-color fallback when applying
+    /// gradient theme presets — see `applyDefaults(from:)`.
+    private static func lastStopColor(in gradientSVG: String) -> String? {
+        // Scan for occurrences of stop-color="…"; take the last one. The
+        // built-in gradient strings are tiny so a linear scan is fine.
+        let needle = "stop-color=\""
+        var search = gradientSVG[...]
+        var last: String? = nil
+        while let openRange = search.range(of: needle) {
+            let valueStart = openRange.upperBound
+            guard let closeQuote = search[valueStart...].firstIndex(of: "\"") else { break }
+            last = String(search[valueStart..<closeQuote])
+            search = search[closeQuote...]
+        }
+        return last
     }
 
     // MARK: - Image picker
@@ -394,7 +452,7 @@ struct ThemeEditorView: View {
             footer
         }
         .padding(20)
-        .frame(minWidth: 1000, minHeight: 800)
+        .frame(minWidth: 1000, minHeight: 880)
         .onAppear { model.regeneratePreview() }
     }
 
@@ -424,6 +482,13 @@ struct ThemeEditorView: View {
                 Spacer()
             }
 
+            HStack {
+                Text("Preset").frame(width: 110, alignment: .leading)
+                presetMenu
+                    .frame(maxWidth: 280)
+                Spacer()
+            }
+
             ColorRow(label: "Background", color: $model.background, trailing: {
                 imageRowControls
             })
@@ -443,6 +508,30 @@ struct ThemeEditorView: View {
                     .font(.system(.caption, design: .monospaced))
                     .foregroundStyle(model.sourceImagePath == nil ? .secondary : .primary)
                 Spacer()
+            }
+        }
+    }
+
+    /// Drop-down that lets the user paste another theme's color palette
+    /// onto the current draft without leaving the window. Only the color
+    /// fields are copied — name, image background, and dim overlay stay
+    /// put so the user can A/B presets while keeping their bespoke
+    /// image/blur setup. Built-ins listed first; other custom themes
+    /// (excluding the one being edited) appear below them.
+    private var presetMenu: some View {
+        Menu("Apply defaults from…") {
+            Section("Built-in") {
+                ForEach(Themes.builtins, id: \.id) { theme in
+                    Button(theme.id) { model.applyDefaults(from: theme) }
+                }
+            }
+            let customs = CustomThemes.shared.all().filter { $0.id != model.originalThemeID }
+            if !customs.isEmpty {
+                Section("Custom") {
+                    ForEach(customs, id: \.id) { theme in
+                        Button(theme.id) { model.applyDefaults(from: theme) }
+                    }
+                }
             }
         }
     }
@@ -487,16 +576,41 @@ private struct ColorRow<Trailing: View>: View {
     @Binding var color: Color
     @ViewBuilder let trailing: Trailing
 
+    /// Local mirror of the bound color as text. We keep this as `@State`
+    /// rather than computing from `color` on every render so the user can
+    /// type partial hex (`#f`, `#ff`) without us yanking the field back
+    /// to the canonical `#rrggbb` form mid-edit.
+    @State private var hexText: String = ""
+
     var body: some View {
         HStack {
             Text(label).frame(width: 110, alignment: .leading)
             ColorPicker("", selection: $color, supportsOpacity: false)
                 .labelsHidden()
                 .frame(width: 44)
-            Text(color.hex)
+            TextField("#rrggbb", text: $hexText)
                 .font(.system(.body, design: .monospaced))
-                .frame(width: 90, alignment: .leading)
-                .foregroundStyle(.secondary)
+                .textFieldStyle(.roundedBorder)
+                .frame(width: 100)
+                .onAppear { hexText = color.hex }
+                // External update (e.g. ColorPicker) → resync the field,
+                // but only if the field doesn't already round-trip to the
+                // same color. Skipping the assignment when they agree
+                // avoids clobbering an in-progress edit that happens to
+                // currently parse to the same color.
+                .onChange(of: color) { _, newColor in
+                    if Color(hex: hexText)?.hex != newColor.hex {
+                        hexText = newColor.hex
+                    }
+                }
+                // User edit → push to the bound color the moment the text
+                // parses as a valid hex. Invalid text (e.g. mid-typing
+                // `#ff`) leaves `color` untouched.
+                .onChange(of: hexText) { _, newText in
+                    if let c = Color(hex: newText), c.hex != color.hex {
+                        color = c
+                    }
+                }
             trailing
             Spacer()
         }
