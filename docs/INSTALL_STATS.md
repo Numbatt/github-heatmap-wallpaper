@@ -1,6 +1,6 @@
 # Install stats
 
-> *Auto-generated from `docs/install-stats.ndjson`. Last snapshot: **2026-05-05T00:34:34Z**. Do not hand-edit — re-run `script/install-stats.sh` to regenerate.*
+> *Auto-generated from `docs/install-stats.ndjson`. Last snapshot: **2026-05-05T05:59:51Z**. Do not hand-edit — re-run `script/install-stats.sh` to regenerate.*
 
 ## Install signals
 
