@@ -43,7 +43,7 @@ It'll ask for your GitHub username, theme, and which displays to use; preview th
 
 ## Themes
 
-Nine themes ship plus an `auto` mode that follows your macOS appearance setting:
+Twelve themes ship plus an `auto` mode that follows your macOS appearance setting:
 
 <table>
   <tr>
@@ -51,38 +51,68 @@ Nine themes ship plus an `auto` mode that follows your macOS appearance setting:
     <td align="center"><b>github-light</b><br><img src="images/torvalds-github-light.png" alt="github-light theme — torvalds's contribution heatmap on white" /></td>
   </tr>
   <tr>
-    <td align="center"><b>paper</b><br><img src="images/torvalds-paper.png" alt="paper theme — torvalds's contribution heatmap in deep navy on cream" /></td>
+    <td align="center"><b>tokyo-night</b><br><img src="images/torvalds-tokyo-night.png" alt="tokyo-night theme — blue→magenta ramp with a cyan headline on midnight blue" /></td>
+    <td align="center"><b>dracula</b><br><img src="images/torvalds-dracula.png" alt="dracula theme — neon green ramp with a hot pink headline on selection grey" /></td>
+  </tr>
+  <tr>
+    <td align="center"><b>nord</b><br><img src="images/torvalds-nord.png" alt="nord theme — frost-blue ramp with a snow headline on polar-night base" /></td>
+    <td align="center"><b>gruvbox-dark</b><br><img src="images/torvalds-gruvbox-dark.png" alt="gruvbox-dark theme — yellow→orange retro ramp with a cream headline" /></td>
+  </tr>
+  <tr>
+    <td align="center"><b>catppuccin-frappe</b><br><img src="images/torvalds-catppuccin-frappe.png" alt="catppuccin-frappe theme — pink headline and green ramp on Catppuccin Frappé base" /></td>
+    <td align="center"><b>catppuccin-mocha</b><br><img src="images/torvalds-catppuccin-mocha.png" alt="catppuccin-mocha theme — pink headline and green ramp on Catppuccin Mocha base" /></td>
+  </tr>
+  <tr>
     <td align="center"><b>midnight</b><br><img src="images/torvalds-midnight.png" alt="midnight theme — torvalds's contribution heatmap on a blue-purple gradient" /></td>
-    <td align="center"><b>catppuccin-frappe</b><br><img src="images/torvalds-catppuccin-frappe.png" alt="catppuccin-frappe theme — torvalds's contribution heatmap with a pink headline and green ramp on Catppuccin Frappé base" /></td>
+    <td align="center"><b>paper</b><br><img src="images/torvalds-paper.png" alt="paper theme — torvalds's contribution heatmap in deep navy on cream" /></td>
   </tr>
   <tr>
     <td align="center"><b>blossom</b><br><img src="images/torvalds-blossom.png" alt="blossom theme — torvalds's contribution heatmap in purple on pastel pink" /></td>
     <td align="center"><b>ocean</b><br><img src="images/torvalds-ocean.png" alt="ocean theme — torvalds's contribution heatmap in teal on pale aqua" /></td>
-    <td align="center"><b>forest</b><br><img src="images/torvalds-forest.png" alt="forest theme — torvalds's contribution heatmap in moss-green on warm cream" /></td>
-  </tr>
-  <tr>
-    <td align="center"><b>sunset</b><br><img src="images/torvalds-sunset.png" alt="sunset theme — torvalds's contribution heatmap in amber on warm cream" /></td>
   </tr>
 </table>
 
 - `auto` — sync with system appearance (default; switches between `github-light` and `github-dark` based on macOS Light/Dark Mode).
-- `github-dark` — green-on-graphite.
-- `github-light` — classic green-on-white.
+- `github-dark` / `github-light` — the canonical GitHub palettes.
+- `tokyo-night` — deep midnight-blue with a blue→magenta ramp and a cyan headline.
+- `dracula` — neon-green ramp anchored on `#50fa7b`, hot-pink headline.
+- `nord` — cool polar-night base with a frost-blue ramp and a snow headline.
+- `gruvbox-dark` — warm retro palette: yellow→orange ramp on a soft brown base, cream headline.
+- `catppuccin-frappe` / `catppuccin-mocha` — Catppuccin palette with a pink headline and green ramp on each flavor's base.
 - `midnight` — deep blue-purple gradient with a custom green ramp.
-- `catppuccin-frappe` — Catppuccin Frappé palette with a pink headline and green ramp on a deep navy base.
 - `paper` — single-ink deep navy on textured off-white.
 - `blossom` — purple ramp on pastel pink, rich rose headline.
-- `sunset` — amber→burnt-sienna ramp on warm cream, terracotta headline.
 - `ocean` — teal→navy ramp on pale aqua, slate headline.
-- `forest` — sage→deep-emerald ramp on warm cream, espresso headline.
 
 Switch any time:
 
 ```sh
-gh-wallpaper theme paper
+gh-wallpaper theme tokyo-night
+gh-wallpaper themes              # list built-in + custom themes
 ```
 
 The wallpaper re-renders immediately and the new theme persists.
+
+### Custom themes
+
+Drop a JSON file into `~/Library/Application Support/gh-wallpaper/themes/`. The file name doesn't matter; the `id` field is what `gh-wallpaper theme <id>` uses.
+
+```json
+{
+  "id": "aurora",
+  "background": "#0b0f1a",
+  "backgroundIsGradient": false,
+  "cellRamp": ["#1a2333", "#2e7d6b", "#56c596", "#8af3c5", "#c9ffe5"],
+  "headlineColor": "#a78bfa"
+}
+```
+
+- `cellRamp` must have exactly 5 colors (level 0 → level 4, low → high contributions).
+- Colors are CSS hex (`#RGB`, `#RGBA`, `#RRGGBB`, or `#RRGGBBAA` — the alpha forms render translucent on top of the background).
+- `backgroundIsGradient: true` lets you pass a `url(#id)` reference in `background` and an `<linearGradient>`/`<radialGradient>` block in `gradientSVG`. See the built-in `midnight` for an example.
+- Files that fail validation are logged once and skipped; they don't break the daemon.
+
+`gh-wallpaper themes` will list any custom themes alongside the built-ins.
 
 ---
 

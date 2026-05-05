@@ -16,6 +16,13 @@ public enum Paths {
         supportDir.appendingPathComponent("state.json")
     }
 
+    /// Directory where users drop custom theme JSON files.
+    /// Each `*.json` file under this dir is loaded at startup, decoded
+    /// into a `Theme`, and made available alongside the built-ins.
+    public static var customThemesDir: URL {
+        supportDir.appendingPathComponent("themes", isDirectory: true)
+    }
+
     public static var previousWallpapersFile: URL {
         supportDir.appendingPathComponent("previous-wallpapers.json")
     }

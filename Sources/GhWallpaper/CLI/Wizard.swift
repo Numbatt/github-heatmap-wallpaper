@@ -175,20 +175,24 @@ public struct Wizard {
     /// Theme picker. Lists themes most-likely-first, accepts either a number
     /// (1–N) or the theme ID. Re-prompts until the user picks something valid.
     private func pickTheme(existing: String?) -> String {
-        // Order intentionally: auto first (most flexible), then dark/light,
-        // then specialty themes. Display labels are user-friendly; the
-        // persisted IDs stay aligned with `Themes.byId(_:)`.
+        // Order intentionally: auto first (most flexible), then GitHub
+        // defaults, then the popular dev-editor themes, then the
+        // designer/specialty palettes. Display labels are user-friendly;
+        // the persisted IDs stay aligned with `Themes.byId(_:)`.
         let choices: [(id: String, label: String)] = [
             ("auto", "auto — sync with system appearance"),
             ("github-dark", "github-dark"),
             ("github-light", "github-light"),
+            ("tokyo-night", "tokyo-night"),
+            ("dracula", "dracula"),
+            ("nord", "nord"),
+            ("gruvbox-dark", "gruvbox-dark"),
+            ("catppuccin-frappe", "catppuccin-frappe"),
+            ("catppuccin-mocha", "catppuccin-mocha"),
             ("midnight", "midnight"),
             ("paper", "paper"),
             ("blossom", "blossom"),
-            ("sunset", "sunset"),
             ("ocean", "ocean"),
-            ("forest", "forest"),
-            ("catppuccin-frappe", "catppuccin-frappe"),
         ]
         print("\nThemes:")
         for (i, choice) in choices.enumerated() {

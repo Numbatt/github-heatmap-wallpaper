@@ -223,7 +223,7 @@ Because the rectangles are axis-aligned and the rasterizer never anti-aliases ax
 
 ### Themes
 
-Four themes ship in v1, plus an `auto` mode:
+Twelve built-in themes ship plus an `auto` mode. The full list (with palettes) lives in [`Sources/GhWallpaper/Render/Themes.swift`](Sources/GhWallpaper/Render/Themes.swift) — the source of truth. The user-facing breakdown is in the [README's Themes section](README.md#themes).
 
 | Theme | Background | Cell ramp (level 0 → 4) | Headline color |
 | --- | --- | --- | --- |
@@ -233,7 +233,7 @@ Four themes ship in v1, plus an `auto` mode:
 | `midnight` | Deep blue→purple radial gradient `#0a0a1f → #1e0a30` | Custom green ramp on the dark base | `#f0e7ff` |
 | `auto` | Switches between `github-light` and `github-dark` based on `defaults read -g AppleInterfaceStyle`. Re-evaluated on each refresh tick — no live listener (the daemon polls system appearance as part of its tick). | — | — |
 
-Future themes can be added as JSON/TOML files in the binary's resource bundle without code changes.
+User-defined themes live in `~/Library/Application Support/gh-wallpaper/themes/*.json`. Each file is decoded directly into a `Theme` (the same `Codable` struct as the built-ins) and registered alongside them. Validation: 5-color ramp, `#RGB`/`#RGBA`/`#RRGGBB`/`#RRGGBBAA` colors, non-empty id that doesn't collide with a built-in. Bad files are logged and skipped — never crash the daemon. See `Sources/GhWallpaper/Render/CustomThemes.swift`.
 
 ---
 
@@ -367,7 +367,7 @@ Could not restore on:
 - Adaptive polling (120s on AC, 5min on battery, paused offline)
 - Event-driven triggers: wake, network, display-change, login
 - HTML scraping of `github.com/users/<username>/contributions` — no PAT
-- All 4 themes + `auto` mode
+- 12 built-in themes + `auto` mode (and user-authored JSON themes since v0.2.0)
 - Multi-monitor with per-display rendering
 - Hand-designed rectangle letterform headline (no font, pure SVG shapes) — included from day one
 - `render` / `refresh` / `theme` / `pause` / `start` / `displays` / `diagnose` / `uninstall` CLI
@@ -377,7 +377,7 @@ Could not restore on:
 
 ### v0.2 (priority follow-up)
 
-- User-authored themes: `~/Library/Application Support/gh-wallpaper/themes/*.toml` loaded at startup.
+- ✅ User-authored themes: `~/Library/Application Support/gh-wallpaper/themes/*.json` loaded on demand. (Shipped in v0.2.0; format is JSON, not TOML — JSON round-trips through `Theme`'s `Codable` shape with zero glue code.)
 - "Render anyone's heatmap" web page or shareable PNG export, generated on demand.
 
 ### Out of scope (v1)

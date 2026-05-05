@@ -23,17 +23,7 @@ struct CanvasSpec {
 }
 
 let fixtures = ["active", "sparse", "empty"]
-let themes: [(label: String, theme: Theme)] = [
-    ("github-dark", Themes.githubDark),
-    ("github-light", Themes.githubLight),
-    ("paper", Themes.paper),
-    ("midnight", Themes.midnight),
-    ("blossom", Themes.blossom),
-    ("sunset", Themes.sunset),
-    ("ocean", Themes.ocean),
-    ("forest", Themes.forest),
-    ("catppuccin-frappe", Themes.catppuccinFrappe),
-]
+let themes: [(label: String, theme: Theme)] = Themes.builtins.map { ($0.id, $0) }
 let canvases = [
     CanvasSpec(label: "2880x1800", width: 2880, height: 1800),  // 14" MBP at retina
     CanvasSpec(label: "5120x2880", width: 5120, height: 2880),  // 5K external
@@ -76,7 +66,7 @@ FileHandle.standardError.write(Data(
 // behind an env var to keep the default `swift run SnapshotGen` offline.
 //
 //   GENERATE_GALLERY=1 swift run SnapshotGen
-//   GENERATE_GALLERY=1 GALLERY_THEMES=blossom,sunset,ocean,forest swift run SnapshotGen
+//   GENERATE_GALLERY=1 GALLERY_THEMES=tokyo-night,dracula,nord swift run SnapshotGen
 //
 // Requires `resvg` on PATH (same as the binary). Output dimensions match
 // the existing gallery (3420×2214) so the README table stays consistent.

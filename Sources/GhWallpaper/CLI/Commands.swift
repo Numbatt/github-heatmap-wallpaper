@@ -22,6 +22,7 @@ public enum Commands {
         case "render":                   return await runRender(args: Array(args.dropFirst()))
         case "refresh":                  return await runRefresh()
         case "theme":                    return await runTheme(args: Array(args.dropFirst()))
+        case "themes":                   return runThemes()
         case "pause":                    return runPause()
         case "start":                    return runStart()
         case "displays":                 return runDisplays()
@@ -75,7 +76,7 @@ public enum Commands {
         if let themeID {
             guard let resolved = Themes.byId(themeID) else {
                 FileHandle.standardError.write(Data(
-                    "unknown theme: \(themeID) (valid: github-dark, github-light, paper, midnight, blossom, sunset, ocean, forest, catppuccin-frappe, auto)\n".utf8
+                    "unknown theme: \(themeID) (run `gh-wallpaper themes` to list available themes)\n".utf8
                 ))
                 return 1
             }
@@ -105,11 +106,15 @@ public enum Commands {
 
     private static func runTheme(args: [String]) async -> Int32 {
         guard let id = args.first else {
-            FileHandle.standardError.write(Data("usage: gh-wallpaper theme <github-dark|github-light|paper|midnight|blossom|sunset|ocean|forest|catppuccin-frappe|auto>\n".utf8))
+            FileHandle.standardError.write(Data(
+                "usage: gh-wallpaper theme <id>  (run `gh-wallpaper themes` to list available themes)\n".utf8
+            ))
             return 1
         }
         guard Themes.byId(id) != nil else {
-            FileHandle.standardError.write(Data("unknown theme: \(id)\n".utf8))
+            FileHandle.standardError.write(Data(
+                "unknown theme: \(id) (run `gh-wallpaper themes` to list available themes)\n".utf8
+            ))
             return 1
         }
         guard var config = try? ConfigStore.read() else {
@@ -127,6 +132,30 @@ public enum Commands {
             FileHandle.standardError.write(Data("could not save config: \(error)\n".utf8))
             return 1
         }
+    }
+
+    private static func runThemes() -> Int32 {
+        print("Built-in themes:")
+        for theme in Themes.builtins {
+            print("  \(theme.id)")
+        }
+        print("  auto                (sync with system appearance)")
+
+        let custom = CustomThemes.shared.all()
+        if custom.isEmpty {
+            print("""
+
+            Custom themes: none.
+              Drop JSON files in \(Paths.customThemesDir.path)
+              See README for the schema.
+            """)
+        } else {
+            print("\nCustom themes (from \(Paths.customThemesDir.path)):")
+            for theme in custom {
+                print("  \(theme.id)")
+            }
+        }
+        return 0
     }
 
     private static func runPause() -> Int32 {
@@ -296,10 +325,9 @@ public enum Commands {
           gh-wallpaper render [--user X]       Render PNG to disk without setting wallpaper
                               [--theme T]
           gh-wallpaper refresh                 Force an immediate refresh + set wallpaper
-          gh-wallpaper theme <id>              Switch theme. Valid ids:
-                                                 github-dark, github-light, paper, midnight,
-                                                 blossom, sunset, ocean, forest,
-                                                 catppuccin-frappe, auto
+          gh-wallpaper theme <id>              Switch theme. Run `gh-wallpaper themes` to
+                                               list built-in + custom themes.
+          gh-wallpaper themes                  List available themes (built-in + custom)
           gh-wallpaper pause                   Stop the launchd agent
           gh-wallpaper start                   Start the launchd agent
           gh-wallpaper displays                List connected displays

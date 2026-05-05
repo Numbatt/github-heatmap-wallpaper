@@ -22,17 +22,8 @@ final class SVGSnapshotTests: XCTestCase {
         ("5120x2880", 5120, 2880),
     ]
 
-    private static let themes: [(label: String, theme: Theme)] = [
-        ("github-dark", Themes.githubDark),
-        ("github-light", Themes.githubLight),
-        ("paper", Themes.paper),
-        ("midnight", Themes.midnight),
-        ("blossom", Themes.blossom),
-        ("sunset", Themes.sunset),
-        ("ocean", Themes.ocean),
-        ("forest", Themes.forest),
-        ("catppuccin-frappe", Themes.catppuccinFrappe),
-    ]
+    private static let themes: [(label: String, theme: Theme)] =
+        Themes.builtins.map { ($0.id, $0) }
 
     private static let fixtures = ["active", "sparse", "empty"]
 
