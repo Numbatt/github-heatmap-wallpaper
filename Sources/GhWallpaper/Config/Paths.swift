@@ -23,6 +23,13 @@ public enum Paths {
         supportDir.appendingPathComponent("themes", isDirectory: true)
     }
 
+    /// Directory inside `customThemesDir` where the editor stores image
+    /// backgrounds copied from the user's photo picker. Theme JSONs
+    /// reference these as `images/<theme-id>.<ext>` (relative paths).
+    public static var customThemesImagesDir: URL {
+        customThemesDir.appendingPathComponent("images", isDirectory: true)
+    }
+
     public static var previousWallpapersFile: URL {
         supportDir.appendingPathComponent("previous-wallpapers.json")
     }

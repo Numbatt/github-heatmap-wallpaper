@@ -22,7 +22,7 @@ public enum Commands {
         case "render":                   return await runRender(args: Array(args.dropFirst()))
         case "refresh":                  return await runRefresh()
         case "theme":                    return await runTheme(args: Array(args.dropFirst()))
-        case "themes":                   return runThemes()
+        case "themes":                   return await runThemes(args: Array(args.dropFirst()))
         case "pause":                    return runPause()
         case "start":                    return runStart()
         case "displays":                 return runDisplays()
@@ -104,13 +104,50 @@ public enum Commands {
         )
     }
 
+    private static let builtinThemeIDs: Set<String> = Set(Themes.builtins.map(\.id) + ["auto"])
+
+    /// `theme <id>` applies a theme. `theme <id> --edit` opens the editor:
+    ///   - if `<id>` is a built-in, the editor is seeded from it and the
+    ///     user must pick a new name to save (built-ins are immutable);
+    ///   - if `<id>` is a custom, the editor edits it in place;
+    ///   - if `<id>` doesn't exist, the command errors and points the
+    ///     user at `gh-wallpaper themes new <id>`.
     private static func runTheme(args: [String]) async -> Int32 {
-        guard let id = args.first else {
+        var themeID: String? = nil
+        var edit = false
+        for a in args {
+            if a == "--edit" { edit = true; continue }
+            if themeID == nil { themeID = a; continue }
             FileHandle.standardError.write(Data(
-                "usage: gh-wallpaper theme <id>  (run `gh-wallpaper themes` to list available themes)\n".utf8
+                "unexpected argument: \(a)\nusage: gh-wallpaper theme <id> [--edit]\n".utf8
             ))
             return 1
         }
+        guard let id = themeID else {
+            FileHandle.standardError.write(Data(
+                "usage: gh-wallpaper theme <id> [--edit]  (run `gh-wallpaper themes` to list available themes)\n".utf8
+            ))
+            return 1
+        }
+
+        if edit {
+            // Seed comes from whatever this id resolves to. Built-ins get
+            // forked (mustRename); existing customs edit in place.
+            guard let seed = Themes.byId(id) else {
+                FileHandle.standardError.write(Data(
+                    "no such theme '\(id)'. Try `gh-wallpaper themes new \(id)` to create one.\n".utf8
+                ))
+                return 1
+            }
+            let isBuiltin = builtinThemeIDs.contains(id)
+            return await runEditor(
+                seed: seed,
+                initialName: isBuiltin ? id : id,
+                mustRename: isBuiltin
+            )
+        }
+
+        // Plain apply.
         guard Themes.byId(id) != nil else {
             FileHandle.standardError.write(Data(
                 "unknown theme: \(id) (run `gh-wallpaper themes` to list available themes)\n".utf8
@@ -134,7 +171,60 @@ public enum Commands {
         }
     }
 
-    private static func runThemes() -> Int32 {
+    /// Shared editor entrypoint used by `theme <id> --edit` and
+    /// `themes new <name>`. Opens the SwiftUI window, persists the result,
+    /// and (when the user clicks Save & Apply) writes the new id to config
+    /// and refreshes the wallpaper.
+    private static func runEditor(seed: Theme, initialName: String, mustRename: Bool) async -> Int32 {
+        let outcome = await MainActor.run {
+            ThemeEditor.run(seed: seed, themeName: initialName, mustRename: mustRename)
+        }
+        switch outcome {
+        case .cancelled:
+            print("(cancelled)")
+            return 0
+        case .saved(let id, let applyImmediately):
+            print("✓ saved theme '\(id)' to \(Paths.customThemesDir.path)")
+            if applyImmediately {
+                guard var config = try? ConfigStore.read() else {
+                    FileHandle.standardError.write(Data(
+                        "no config; run `gh-wallpaper` to set up before applying themes.\n".utf8
+                    ))
+                    return 0  // theme is still saved; just couldn't apply
+                }
+                config.themeID = id
+                do {
+                    try ConfigStore.write(config)
+                    print("→ applying \(id)…")
+                    return await runRefreshOnce(config: config)
+                } catch {
+                    FileHandle.standardError.write(Data("could not save config: \(error)\n".utf8))
+                    return 1
+                }
+            }
+            return 0
+        }
+    }
+
+    /// `themes` (no verb) lists built-in + custom themes.
+    /// `themes <verb>` dispatches to CRUD actions: new / delete / export / import.
+    private static func runThemes(args: [String]) async -> Int32 {
+        guard let verb = args.first else { return runThemesList() }
+        let rest = Array(args.dropFirst())
+        switch verb {
+        case "new":     return await runThemesNew(args: rest)
+        case "delete":  return runThemesDelete(args: rest)
+        case "export":  return runThemesExport(args: rest)
+        case "import":  return runThemesImport()
+        default:
+            FileHandle.standardError.write(Data(
+                "unknown verb: \(verb)\nusage: gh-wallpaper themes [new|delete|export|import] [...]\n".utf8
+            ))
+            return 1
+        }
+    }
+
+    private static func runThemesList() -> Int32 {
         print("Built-in themes:")
         for theme in Themes.builtins {
             print("  \(theme.id)")
@@ -146,16 +236,187 @@ public enum Commands {
             print("""
 
             Custom themes: none.
-              Drop JSON files in \(Paths.customThemesDir.path)
-              See README for the schema.
+              Create one with `gh-wallpaper themes new <name>` (visual editor),
+              or fork a built-in with `gh-wallpaper theme <id> --edit`.
             """)
         } else {
             print("\nCustom themes (from \(Paths.customThemesDir.path)):")
             for theme in custom {
                 print("  \(theme.id)")
             }
+            print("\nTip: edit any of these with `gh-wallpaper theme <name> --edit`.")
         }
         return 0
+    }
+
+    private static func runThemesNew(args: [String]) async -> Int32 {
+        var name: String? = nil
+        var fromID: String? = nil
+        var i = 0
+        while i < args.count {
+            let a = args[i]
+            if a == "--from" {
+                guard let v = args[safe: i + 1] else {
+                    FileHandle.standardError.write(Data("--from requires a theme id\n".utf8))
+                    return 1
+                }
+                fromID = v
+                i += 2
+                continue
+            }
+            if name == nil {
+                name = a
+                i += 1
+                continue
+            }
+            FileHandle.standardError.write(Data("unexpected argument: \(a)\n".utf8))
+            return 1
+        }
+        guard let n = name, !n.isEmpty else {
+            FileHandle.standardError.write(Data(
+                "usage: gh-wallpaper themes new <name> [--from <id>]\n".utf8
+            ))
+            return 1
+        }
+        if builtinThemeIDs.contains(n) {
+            FileHandle.standardError.write(Data(
+                "'\(n)' is a built-in theme. Pick a different name (e.g. 'my-\(n)') — built-ins are immutable.\n".utf8
+            ))
+            return 1
+        }
+        if CustomThemes.shared.find(id: n) != nil {
+            FileHandle.standardError.write(Data(
+                "theme '\(n)' already exists. Use `gh-wallpaper theme \(n) --edit` to edit it, or `themes delete \(n)` first.\n".utf8
+            ))
+            return 1
+        }
+
+        // Seed precedence: --from <id> wins; else current config theme;
+        // else github-dark.
+        let seed: Theme
+        if let fromID = fromID {
+            guard let t = Themes.byId(fromID) else {
+                FileHandle.standardError.write(Data(
+                    "--from references unknown theme '\(fromID)'\n".utf8
+                ))
+                return 1
+            }
+            seed = t
+        } else if let cfg = try? ConfigStore.read() {
+            seed = cfg.resolvedTheme()
+        } else {
+            seed = Themes.githubDark
+        }
+
+        return await runEditor(seed: seed, initialName: n, mustRename: false)
+    }
+
+    private static func runThemesDelete(args: [String]) -> Int32 {
+        guard let name = args.first else {
+            FileHandle.standardError.write(Data(
+                "usage: gh-wallpaper themes delete <name>\n".utf8
+            ))
+            return 1
+        }
+        if builtinThemeIDs.contains(name) {
+            FileHandle.standardError.write(Data(
+                "'\(name)' is a built-in theme; built-ins cannot be deleted.\n".utf8
+            ))
+            return 1
+        }
+        guard CustomThemes.shared.find(id: name) != nil else {
+            FileHandle.standardError.write(Data(
+                "no custom theme named '\(name)' (run `gh-wallpaper themes` to list).\n".utf8
+            ))
+            return 1
+        }
+        let fm = FileManager.default
+        let json = Paths.customThemesDir.appendingPathComponent("\(name).json")
+        do {
+            try fm.removeItem(at: json)
+        } catch {
+            FileHandle.standardError.write(Data("could not delete \(json.path): \(error)\n".utf8))
+            return 1
+        }
+        // Best-effort: remove any matching image extension (png/jpg/jpeg).
+        for ext in ["png", "jpg", "jpeg"] {
+            let img = Paths.customThemesImagesDir.appendingPathComponent("\(name).\(ext)")
+            if fm.fileExists(atPath: img.path) {
+                try? fm.removeItem(at: img)
+            }
+        }
+        CustomThemes.shared.reload()
+        print("✓ deleted theme '\(name)'")
+        return 0
+    }
+
+    private static func runThemesExport(args: [String]) -> Int32 {
+        guard let name = args.first else {
+            FileHandle.standardError.write(Data(
+                "usage: gh-wallpaper themes export <name>\n".utf8
+            ))
+            return 1
+        }
+        guard let theme = Themes.byId(name) else {
+            FileHandle.standardError.write(Data(
+                "no such theme '\(name)' (run `gh-wallpaper themes` to list).\n".utf8
+            ))
+            return 1
+        }
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        do {
+            let data = try encoder.encode(theme)
+            FileHandle.standardOutput.write(data)
+            FileHandle.standardOutput.write(Data("\n".utf8))
+            return 0
+        } catch {
+            FileHandle.standardError.write(Data("could not encode theme: \(error)\n".utf8))
+            return 1
+        }
+    }
+
+    private static func runThemesImport() -> Int32 {
+        let stdin = FileHandle.standardInput
+        let data = stdin.readDataToEndOfFile()
+        if data.isEmpty {
+            FileHandle.standardError.write(Data(
+                "no JSON received on stdin. Pipe a theme: `cat theme.json | gh-wallpaper themes import`\n".utf8
+            ))
+            return 1
+        }
+        let decoded: Theme
+        do {
+            decoded = try JSONDecoder().decode(Theme.self, from: data)
+        } catch {
+            FileHandle.standardError.write(Data("could not parse JSON: \(error)\n".utf8))
+            return 1
+        }
+        if builtinThemeIDs.contains(decoded.id) {
+            FileHandle.standardError.write(Data(
+                "id '\(decoded.id)' collides with a built-in. Edit the JSON to use a different id (e.g. 'my-\(decoded.id)') and re-import.\n".utf8
+            ))
+            return 1
+        }
+        // Validate without a base directory — relative image paths are
+        // rejected at import time since we have no obvious base to resolve
+        // them against. Users wanting an image background should put the
+        // image at an absolute path or use the editor.
+        let validated: Theme
+        switch CustomThemes.validate(theme: decoded, baseDirectory: nil) {
+        case .success(let t):  validated = t
+        case .failure(let e):
+            FileHandle.standardError.write(Data("invalid theme: \(e.message)\n".utf8))
+            return 1
+        }
+        do {
+            let url = try CustomThemes.shared.save(validated)
+            print("✓ imported theme '\(validated.id)' to \(url.path)")
+            return 0
+        } catch {
+            FileHandle.standardError.write(Data("could not save: \(error)\n".utf8))
+            return 1
+        }
     }
 
     private static func runPause() -> Int32 {
@@ -325,9 +586,16 @@ public enum Commands {
           gh-wallpaper render [--user X]       Render PNG to disk without setting wallpaper
                               [--theme T]
           gh-wallpaper refresh                 Force an immediate refresh + set wallpaper
-          gh-wallpaper theme <id>              Switch theme. Run `gh-wallpaper themes` to
-                                               list built-in + custom themes.
-          gh-wallpaper themes                  List available themes (built-in + custom)
+          gh-wallpaper theme <id>              Apply a theme (built-in or custom).
+          gh-wallpaper theme <id> --edit       Open the editor seeded from <id>.
+                                               Built-ins fork on save (must rename);
+                                               customs edit in place.
+          gh-wallpaper themes                  List built-in + custom themes
+          gh-wallpaper themes new <name>       Create a new custom theme in the editor
+                              [--from <id>]    (optionally seed from any existing theme)
+          gh-wallpaper themes delete <name>    Remove a custom theme + its image
+          gh-wallpaper themes export <name>    Print theme JSON to stdout (works for built-ins)
+          gh-wallpaper themes import           Read theme JSON from stdin and save it
           gh-wallpaper pause                   Stop the launchd agent
           gh-wallpaper start                   Start the launchd agent
           gh-wallpaper displays                List connected displays

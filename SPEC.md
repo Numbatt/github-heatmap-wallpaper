@@ -237,6 +237,8 @@ User-defined themes live in `~/Library/Application Support/gh-wallpaper/themes/*
 
 Custom themes can additionally specify `backgroundImagePath` (PNG/JPEG file behind the heatmap) and `backgroundDimAlpha` (0–1 black overlay for contrast). The image is rendered via SVG `<image>` so the existing resvg pipeline stays unchanged. The daemon's render hash includes image mtime + size so swapping the file on disk triggers a re-render.
 
+The visual editor (`gh-wallpaper theme-edit <name>`) opens a SwiftUI window with system color pickers, an image picker, dim slider, and a live preview rendered from the same `SVGBuilder` + `Rasterizer` pipeline as the daemon. The editor only loads on the `theme-edit` code path — the daemon never imports `Sources/GhWallpaper/UI/`, so the launchd-loaded process stays headless.
+
 ---
 
 ## 9. Rendering pipeline

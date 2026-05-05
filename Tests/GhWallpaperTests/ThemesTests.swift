@@ -232,6 +232,32 @@ final class ThemesTests: XCTestCase {
         XCTAssertEqual(resolved?.backgroundIsGradient, false)
     }
 
+    func testCustomThemeSaveRoundTrip() throws {
+        let tmp = try makeTempThemesDir()
+        defer { try? FileManager.default.removeItem(at: tmp) }
+
+        CustomThemes.shared.directoryOverride = tmp
+        defer {
+            CustomThemes.shared.directoryOverride = nil
+            CustomThemes.shared.reload()
+        }
+
+        let theme = Theme(
+            id: "round-trip",
+            background: "#101010",
+            backgroundIsGradient: false,
+            cellRamp: ["#111111", "#222222", "#333333", "#444444", "#555555"],
+            headlineColor: "#aabbcc"
+        )
+        let url = try CustomThemes.shared.save(theme)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: url.path))
+
+        let resolved = Themes.byId("round-trip")
+        XCTAssertNotNil(resolved)
+        XCTAssertEqual(resolved?.background, "#101010")
+        XCTAssertEqual(resolved?.headlineColor, "#aabbcc")
+    }
+
     func testHexValidator() {
         XCTAssertTrue(CustomThemes.isValidHex("#abc"))
         XCTAssertTrue(CustomThemes.isValidHex("#abcd"))

@@ -41,6 +41,23 @@ public final class CustomThemes: @unchecked Sendable {
         queue.sync { cache = nil }
     }
 
+    /// Writes a theme to `Paths.customThemesDir/<id>.json` (or
+    /// `directoryOverride` if set). Creates the directory if missing.
+    /// Uses pretty-printed, sorted-key JSON so files diff cleanly.
+    /// Caller is responsible for refusing to write over a built-in id.
+    @discardableResult
+    public func save(_ theme: Theme) throws -> URL {
+        let dir = directoryOverride ?? Paths.customThemesDir
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let url = dir.appendingPathComponent("\(theme.id).json")
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        let data = try encoder.encode(theme)
+        try data.write(to: url, options: [.atomic])
+        reload()
+        return url
+    }
+
     // MARK: - Internal
 
     private func loadOnce() -> [String: Theme] {

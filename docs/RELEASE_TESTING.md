@@ -44,6 +44,27 @@ This corresponds to the checklist in `SPEC.md` §17.
       wallpaper updates.** Pick a theme different from the wizard
       selection (e.g. `paper` or `midnight`). The wallpaper should
       re-render and re-set within seconds — no restart, no re-login.
+- [ ] **4a. Open the visual theme editor and create a custom theme.**
+      Run `gh-wallpaper themes new my-test`. The window opens with
+      seven color pickers and a live preview. Drag a color well —
+      the preview should update within ~250ms. Click "Add image…"
+      and pick a PNG/JPEG; preview should show the photo behind
+      the heatmap with the dim overlay. Click **Save & apply 'my-test'**.
+      Wallpaper switches to the new theme. Run
+      `gh-wallpaper themes` and confirm `my-test` is listed.
+- [ ] **4b. Fork a built-in theme via `theme <id> --edit`.**
+      Run `gh-wallpaper theme dracula --edit`. Editor opens seeded
+      from dracula, name field empty (placeholder "my-dracula"),
+      Save buttons disabled. Type "my-dracula" — Save buttons
+      enable and read "Save as custom theme 'my-dracula'" /
+      "Save & apply 'my-dracula'". Click Save & apply, confirm
+      wallpaper changes.
+- [ ] **4c. Verify CRUD on `themes`.**
+      `gh-wallpaper themes export dracula | sed 's/dracula/imported-dracula/g' | gh-wallpaper themes import`
+      should round-trip. Then
+      `gh-wallpaper themes delete imported-dracula` removes it.
+      `gh-wallpaper themes delete dracula` should refuse
+      ("built-ins are immutable").
 - [ ] **5. Plug in an external display and verify a per-display PNG
       appears.** Connect an external monitor. Within the debounce
       window (~30s), the daemon should render a separate PNG sized to

@@ -99,7 +99,26 @@ The wallpaper re-renders immediately and the new theme persists.
 
 ### Custom themes
 
-Drop a JSON file into `~/Library/Application Support/gh-wallpaper/themes/`. The file name doesn't matter; the `id` field is what `gh-wallpaper theme <id>` uses.
+The fastest way to make a theme is the visual editor:
+
+```sh
+gh-wallpaper themes new my-theme           # from scratch
+gh-wallpaper theme dracula --edit          # fork an existing theme (built-in or custom)
+gh-wallpaper theme my-theme --edit         # tweak a custom theme you already saved
+```
+
+A native macOS window opens with system color pickers, an image-background picker, a dim slider, and a live preview. Click **Save & apply '<name>'** to commit and set it as your wallpaper immediately. Forking a built-in (`theme dracula --edit`) requires picking a new name on save — built-ins are immutable.
+
+Other commands:
+
+```sh
+gh-wallpaper themes                  # list built-in + custom
+gh-wallpaper themes delete my-theme  # remove a custom theme
+gh-wallpaper themes export dracula > my-dracula.json   # share a theme as JSON
+gh-wallpaper themes import < my-theme.json             # ingest from stdin
+```
+
+Power users can also drop a JSON file into `~/Library/Application Support/gh-wallpaper/themes/` directly:
 
 ```json
 {
