@@ -235,6 +235,8 @@ Twelve built-in themes ship plus an `auto` mode. The full list (with palettes) l
 
 User-defined themes live in `~/Library/Application Support/gh-wallpaper/themes/*.json`. Each file is decoded directly into a `Theme` (the same `Codable` struct as the built-ins) and registered alongside them. Validation: 5-color ramp, `#RGB`/`#RGBA`/`#RRGGBB`/`#RRGGBBAA` colors, non-empty id that doesn't collide with a built-in. Bad files are logged and skipped — never crash the daemon. See `Sources/GhWallpaper/Render/CustomThemes.swift`.
 
+Custom themes can additionally specify `backgroundImagePath` (PNG/JPEG file behind the heatmap) and `backgroundDimAlpha` (0–1 black overlay for contrast). The image is rendered via SVG `<image>` so the existing resvg pipeline stays unchanged. The daemon's render hash includes image mtime + size so swapping the file on disk triggers a re-render.
+
 ---
 
 ## 9. Rendering pipeline

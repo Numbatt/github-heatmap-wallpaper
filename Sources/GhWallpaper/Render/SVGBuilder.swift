@@ -67,6 +67,23 @@ public struct SVGBuilder: Sendable {
 
         svg += #"  <rect x="0" y="0" width="100%" height="100%" fill="\#(theme.background)"/>"# + "\n"
 
+        // Image background (if set) draws on top of the solid/gradient fill,
+        // then a translucent black overlay sits between the image and the
+        // heatmap so the cells stay readable on busy photos. resvg renders
+        // SVG <image> natively; the href must be a file:// URL pointing at
+        // an absolute path (resolved by CustomThemes.resolvedImagePath).
+        if let imagePath = theme.backgroundImagePath, !imagePath.isEmpty {
+            let escaped = escapeXMLAttribute(imagePath)
+            svg += #"  <image href="file://\#(escaped)" "#
+            svg += #"x="0" y="0" width="100%" height="100%" "#
+            svg += #"preserveAspectRatio="xMidYMid slice"/>"# + "\n"
+            let alpha = (theme.backgroundDimAlpha ?? 0.4).clamped01()
+            if alpha > 0 {
+                svg += #"  <rect x="0" y="0" width="100%" height="100%" "#
+                svg += #"fill="rgba(0,0,0,\#(round3(alpha)))"/>"# + "\n"
+            }
+        }
+
         // Headline. Pass the bottom-anchor target — Headline.swift will lay out
         // from a top, so we provide topGuess and let it overflow upward only
         // if the actual height ends up smaller (it won't shift visually since
@@ -115,5 +132,30 @@ public struct SVGBuilder: Sendable {
 
     private func round3(_ v: Double) -> String {
         return String(format: "%.3f", v)
+    }
+
+    /// Escapes characters that would break an XML attribute value.
+    /// File paths can contain `&`, `<`, `>`, `"`; absolute paths from a
+    /// trusted directory rarely do, but custom themes can be hand-edited.
+    private func escapeXMLAttribute(_ s: String) -> String {
+        var out = ""
+        out.reserveCapacity(s.count)
+        for c in s {
+            switch c {
+            case "&":  out += "&amp;"
+            case "<":  out += "&lt;"
+            case ">":  out += "&gt;"
+            case "\"": out += "&quot;"
+            case "'":  out += "&apos;"
+            default:   out.append(c)
+            }
+        }
+        return out
+    }
+}
+
+private extension Double {
+    func clamped01() -> Double {
+        return Swift.min(1.0, Swift.max(0.0, self))
     }
 }

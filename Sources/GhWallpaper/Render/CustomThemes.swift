@@ -69,8 +69,8 @@ public final class CustomThemes: @unchecked Sendable {
         var loaded: [String: Theme] = [:]
         let builtinIDs = Set(Themes.builtins.map { $0.id } + ["auto"])
         for url in entries where url.pathExtension.lowercased() == "json" {
-            guard let theme = decode(url: url) else { continue }
-            guard validate(theme: theme, source: url) else { continue }
+            guard let decoded = decode(url: url) else { continue }
+            guard let theme = validateAndResolve(theme: decoded, source: url) else { continue }
             if builtinIDs.contains(theme.id) {
                 Logger.shared.warn(
                     "custom themes: \(url.lastPathComponent) uses reserved id '\(theme.id)' — skipping"
@@ -103,41 +103,123 @@ public final class CustomThemes: @unchecked Sendable {
         }
     }
 
-    private func validate(theme: Theme, source: URL) -> Bool {
+    /// Validates a decoded theme and rewrites `backgroundImagePath` to an
+    /// absolute filesystem path on success. Returns nil if validation fails
+    /// (with a Logger.warn for each rejected file); returns the (possibly
+    /// transformed) `Theme` on success.
+    private func validateAndResolve(theme: Theme, source: URL) -> Theme? {
+        switch Self.validate(theme: theme, baseDirectory: source.deletingLastPathComponent()) {
+        case .success(let resolved):
+            return resolved
+        case .failure(let err):
+            Logger.shared.warn("custom themes: \(source.lastPathComponent) \(err.message)")
+            return nil
+        }
+    }
+
+    /// Pure validator usable from any caller (e.g. `themes import` from
+    /// stdin). Returns the theme with `backgroundImagePath` rewritten to an
+    /// absolute path on success; otherwise a `ValidationError` with a
+    /// human-readable message the caller can print to stderr.
+    ///
+    /// Pass `baseDirectory: nil` to forbid relative `backgroundImagePath`
+    /// values (use absolute or `~/` paths only). With `baseDirectory` set,
+    /// relative paths resolve against that directory.
+    public enum ValidationError: Error, CustomStringConvertible {
+        case empty(field: String)
+        case wrongRampLength(got: Int)
+        case invalidColor(String)
+        case gradientWithoutSVG
+        case invalidBackgroundColor(String)
+        case imagePathRelativeWithoutBase
+        case imageExtensionNotSupported(String)
+        case imageNotFound(String)
+        case dimAlphaOutOfRange(Double)
+
+        public var message: String {
+            switch self {
+            case .empty(let f):                return "\(f) is empty"
+            case .wrongRampLength(let n):       return "cellRamp must have 5 entries (got \(n))"
+            case .invalidColor(let c):          return "invalid color '\(c)'"
+            case .gradientWithoutSVG:           return "marked backgroundIsGradient but missing gradientSVG"
+            case .invalidBackgroundColor(let b):return "invalid background '\(b)' (use #RRGGBB or set backgroundIsGradient)"
+            case .imagePathRelativeWithoutBase: return "backgroundImagePath must be absolute (or ~/-prefixed) when imported from stdin"
+            case .imageExtensionNotSupported(let e): return "backgroundImagePath must be png/jpg/jpeg (got '.\(e)')"
+            case .imageNotFound(let p):         return "backgroundImagePath not found at \(p)"
+            case .dimAlphaOutOfRange(let v):    return "backgroundDimAlpha must be 0…1 (got \(v))"
+            }
+        }
+
+        public var description: String { message }
+    }
+
+    public static func validate(theme: Theme, baseDirectory: URL?) -> Result<Theme, ValidationError> {
         if theme.id.trimmingCharacters(in: .whitespaces).isEmpty {
-            Logger.shared.warn("custom themes: \(source.lastPathComponent) has empty id")
-            return false
+            return .failure(.empty(field: "id"))
         }
         if theme.cellRamp.count != 5 {
-            Logger.shared.warn(
-                "custom themes: \(source.lastPathComponent) cellRamp must have 5 entries (got \(theme.cellRamp.count))"
-            )
-            return false
+            return .failure(.wrongRampLength(got: theme.cellRamp.count))
         }
         for color in theme.cellRamp + [theme.headlineColor] {
-            if !Self.isValidHex(color) {
-                Logger.shared.warn(
-                    "custom themes: \(source.lastPathComponent) has invalid color '\(color)'"
-                )
-                return false
+            if !isValidHex(color) {
+                return .failure(.invalidColor(color))
             }
         }
-        // Background may be a hex color or a `url(#...)` gradient reference;
-        // we only require the gradient flag + gradientSVG when it looks like one.
         if theme.backgroundIsGradient {
             if theme.gradientSVG == nil {
-                Logger.shared.warn(
-                    "custom themes: \(source.lastPathComponent) marked backgroundIsGradient but missing gradientSVG"
-                )
-                return false
+                return .failure(.gradientWithoutSVG)
             }
-        } else if !Self.isValidHex(theme.background) {
-            Logger.shared.warn(
-                "custom themes: \(source.lastPathComponent) has invalid background '\(theme.background)' (use #RRGGBB or set backgroundIsGradient)"
-            )
-            return false
+        } else if !isValidHex(theme.background) {
+            return .failure(.invalidBackgroundColor(theme.background))
         }
-        return true
+        var resolvedImagePath: String? = nil
+        if let raw = theme.backgroundImagePath, !raw.isEmpty {
+            let trimmed = raw.trimmingCharacters(in: .whitespaces)
+            let isAbsoluteOrTilde = trimmed.hasPrefix("/") || trimmed.hasPrefix("~")
+            if !isAbsoluteOrTilde && baseDirectory == nil {
+                return .failure(.imagePathRelativeWithoutBase)
+            }
+            let baseURL = baseDirectory ?? Paths.customThemesDir
+            let resolved = resolveImagePath(raw, base: baseURL)
+            let allowed: Set<String> = ["png", "jpg", "jpeg"]
+            let ext = (resolved as NSString).pathExtension.lowercased()
+            guard allowed.contains(ext) else {
+                return .failure(.imageExtensionNotSupported(ext))
+            }
+            guard FileManager.default.fileExists(atPath: resolved) else {
+                return .failure(.imageNotFound(resolved))
+            }
+            resolvedImagePath = resolved
+        }
+        if let alpha = theme.backgroundDimAlpha, !(0.0...1.0).contains(alpha) {
+            return .failure(.dimAlphaOutOfRange(alpha))
+        }
+        if resolvedImagePath == nil {
+            return .success(theme)
+        }
+        return .success(Theme(
+            id: theme.id,
+            background: theme.background,
+            backgroundIsGradient: theme.backgroundIsGradient,
+            cellRamp: theme.cellRamp,
+            headlineColor: theme.headlineColor,
+            gradientSVG: theme.gradientSVG,
+            backgroundImagePath: resolvedImagePath,
+            backgroundDimAlpha: theme.backgroundDimAlpha
+        ))
+    }
+
+    /// Resolves a `backgroundImagePath` string to an absolute filesystem path.
+    /// - Absolute (`/foo/bar.png`) → unchanged.
+    /// - Tilde (`~/Pictures/foo.png`) → expanded.
+    /// - Relative (`images/foo.png`) → joined to `base`.
+    static func resolveImagePath(_ raw: String, base: URL) -> String {
+        let trimmed = raw.trimmingCharacters(in: .whitespaces)
+        if trimmed.hasPrefix("/") { return trimmed }
+        if trimmed.hasPrefix("~") {
+            return (trimmed as NSString).expandingTildeInPath
+        }
+        return base.appendingPathComponent(trimmed).standardizedFileURL.path
     }
 
     /// Validates `#RGB`, `#RGBA`, `#RRGGBB`, or `#RRGGBBAA`. Case-insensitive.

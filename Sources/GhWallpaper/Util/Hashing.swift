@@ -42,6 +42,28 @@ public func renderHash(
     hasher.update(data: Data("|".utf8))
     hasher.update(data: Data(theme.headlineColor.utf8))
 
+    // Image background: include path + mtime + size so swapping the
+    // photo on disk invalidates the cached hash even if the JSON is
+    // untouched. Missing file falls through to the path-only hash —
+    // CustomThemes.validateAndResolve already filters non-existent
+    // images at load time, but we want the hash function to be total.
+    if let imagePath = theme.backgroundImagePath, !imagePath.isEmpty {
+        hasher.update(data: Data("|img:".utf8))
+        hasher.update(data: Data(imagePath.utf8))
+        if let attrs = try? FileManager.default.attributesOfItem(atPath: imagePath) {
+            if let mtime = attrs[.modificationDate] as? Date {
+                hasher.update(data: Data(":".utf8))
+                hasher.update(data: Data(String(mtime.timeIntervalSince1970).utf8))
+            }
+            if let size = attrs[.size] as? Int {
+                hasher.update(data: Data(":".utf8))
+                hasher.update(data: Data(String(size).utf8))
+            }
+        }
+        hasher.update(data: Data("|dim:".utf8))
+        hasher.update(data: Data(String(theme.backgroundDimAlpha ?? 0.4).utf8))
+    }
+
     // Canvas dimensions affect the layout math, so they are part of the hash.
     hasher.update(data: Data("\ncanvas:".utf8))
     hasher.update(data: Data(String(canvas.widthPx).utf8))

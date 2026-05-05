@@ -11,6 +11,16 @@ public struct Theme: Equatable, Hashable, Codable, Sendable {
     /// SVGBuilder will embed this inside <defs>...</defs> at the top of
     /// the SVG, and `background` should be a `url(#id)` reference.
     public let gradientSVG: String?
+    /// Optional path to an image (PNG/JPEG) that renders behind the heatmap,
+    /// covering the canvas with `xMidYMid slice`. Resolved as absolute,
+    /// `~/`-relative, or relative to the theme JSON file's directory.
+    /// Mutually compatible with `background` (the solid/gradient fill draws
+    /// first, then the image on top, then the dim overlay if any).
+    public let backgroundImagePath: String?
+    /// Alpha (0.0…1.0) for the black overlay drawn on top of
+    /// `backgroundImagePath` so the heatmap stays readable. Ignored when
+    /// `backgroundImagePath` is nil. Defaults to 0.4 when nil + image is set.
+    public let backgroundDimAlpha: Double?
 
     public init(
         id: String,
@@ -18,7 +28,9 @@ public struct Theme: Equatable, Hashable, Codable, Sendable {
         backgroundIsGradient: Bool = false,
         cellRamp: [String],
         headlineColor: String,
-        gradientSVG: String? = nil
+        gradientSVG: String? = nil,
+        backgroundImagePath: String? = nil,
+        backgroundDimAlpha: Double? = nil
     ) {
         precondition(cellRamp.count == 5, "cellRamp must have exactly 5 entries (levels 0-4)")
         self.id = id
@@ -27,6 +39,28 @@ public struct Theme: Equatable, Hashable, Codable, Sendable {
         self.cellRamp = cellRamp
         self.headlineColor = headlineColor
         self.gradientSVG = gradientSVG
+        self.backgroundImagePath = backgroundImagePath
+        self.backgroundDimAlpha = backgroundDimAlpha
+    }
+
+    /// Tolerant decoder so hand-authored custom-theme JSONs don't have to
+    /// spell out every optional field. Required: `id`, `background`,
+    /// `cellRamp`, `headlineColor`. Everything else defaults.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try c.decode(String.self, forKey: .id)
+        self.background = try c.decode(String.self, forKey: .background)
+        self.backgroundIsGradient = try c.decodeIfPresent(Bool.self, forKey: .backgroundIsGradient) ?? false
+        self.cellRamp = try c.decode([String].self, forKey: .cellRamp)
+        self.headlineColor = try c.decode(String.self, forKey: .headlineColor)
+        self.gradientSVG = try c.decodeIfPresent(String.self, forKey: .gradientSVG)
+        self.backgroundImagePath = try c.decodeIfPresent(String.self, forKey: .backgroundImagePath)
+        self.backgroundDimAlpha = try c.decodeIfPresent(Double.self, forKey: .backgroundDimAlpha)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, background, backgroundIsGradient, cellRamp, headlineColor
+        case gradientSVG, backgroundImagePath, backgroundDimAlpha
     }
 }
 

@@ -133,6 +133,105 @@ final class ThemesTests: XCTestCase {
         XCTAssertEqual(resolved?.background, "#0d1117", "built-in github-dark must not be overridden")
     }
 
+    func testCustomThemeWithImageBackgroundLoads() throws {
+        let tmp = try makeTempThemesDir()
+        defer { try? FileManager.default.removeItem(at: tmp) }
+
+        // Create a small image fixture so validation can confirm it exists.
+        let imagesDir = tmp.appendingPathComponent("images", isDirectory: true)
+        try FileManager.default.createDirectory(at: imagesDir, withIntermediateDirectories: true)
+        let imageURL = imagesDir.appendingPathComponent("bg.png")
+        // Single-pixel PNG, just to satisfy the file-exists check + extension.
+        try Data([0x89, 0x50, 0x4e, 0x47]).write(to: imageURL)
+
+        let json = """
+        {
+          "id": "photo",
+          "background": "#000000",
+          "cellRamp": ["#111111", "#222222", "#444444", "#888888", "#ffffff"],
+          "headlineColor": "#ffffff",
+          "backgroundImagePath": "images/bg.png",
+          "backgroundDimAlpha": 0.6
+        }
+        """
+        try json.write(
+            to: tmp.appendingPathComponent("photo.json"),
+            atomically: true, encoding: .utf8
+        )
+
+        CustomThemes.shared.directoryOverride = tmp
+        CustomThemes.shared.reload()
+        defer {
+            CustomThemes.shared.directoryOverride = nil
+            CustomThemes.shared.reload()
+        }
+
+        let resolved = Themes.byId("photo")
+        XCTAssertNotNil(resolved)
+        XCTAssertEqual(resolved?.backgroundImagePath, imageURL.standardizedFileURL.path)
+        XCTAssertEqual(resolved?.backgroundDimAlpha, 0.6)
+    }
+
+    func testCustomThemeWithMissingImageIsRejected() throws {
+        let tmp = try makeTempThemesDir()
+        defer { try? FileManager.default.removeItem(at: tmp) }
+
+        let json = """
+        {
+          "id": "ghost-photo",
+          "background": "#000000",
+          "cellRamp": ["#111111", "#222222", "#444444", "#888888", "#ffffff"],
+          "headlineColor": "#ffffff",
+          "backgroundImagePath": "images/does-not-exist.png"
+        }
+        """
+        try json.write(
+            to: tmp.appendingPathComponent("ghost.json"),
+            atomically: true, encoding: .utf8
+        )
+
+        CustomThemes.shared.directoryOverride = tmp
+        CustomThemes.shared.reload()
+        defer {
+            CustomThemes.shared.directoryOverride = nil
+            CustomThemes.shared.reload()
+        }
+
+        XCTAssertNil(Themes.byId("ghost-photo"))
+    }
+
+    func testCustomThemeBackgroundIsGradientDefaultsFalse() throws {
+        // The decoder must tolerate hand-authored JSON that omits
+        // `backgroundIsGradient` — earlier versions of the loader required
+        // it explicitly, which broke the README example.
+        let tmp = try makeTempThemesDir()
+        defer { try? FileManager.default.removeItem(at: tmp) }
+
+        let json = """
+        {
+          "id": "minimal",
+          "background": "#112233",
+          "cellRamp": ["#000000", "#333333", "#666666", "#999999", "#ffffff"],
+          "headlineColor": "#ff00ff"
+        }
+        """
+        try json.write(
+            to: tmp.appendingPathComponent("minimal.json"),
+            atomically: true, encoding: .utf8
+        )
+
+        CustomThemes.shared.directoryOverride = tmp
+        CustomThemes.shared.reload()
+        defer {
+            CustomThemes.shared.directoryOverride = nil
+            CustomThemes.shared.reload()
+        }
+
+        let resolved = Themes.byId("minimal")
+        XCTAssertNotNil(resolved)
+        XCTAssertEqual(resolved?.backgroundIsGradient, false)
+    }
+
     func testHexValidator() {
         XCTAssertTrue(CustomThemes.isValidHex("#abc"))
         XCTAssertTrue(CustomThemes.isValidHex("#abcd"))

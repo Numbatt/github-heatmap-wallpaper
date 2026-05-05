@@ -48,7 +48,7 @@ swift build -c release     # release, slow (~30 sec); what brew install runs
 - **`launchctl bootstrap` race.** On Sequoia/Tahoe, `bootstrap` after `bootout` can return exit 5 if launchd hasn't fully torn down the prior PID. `LaunchAgent.install()` handles this with a 200ms sleep + retry.
 - **Default-username fallback was removed deliberately.** Don't add it back. If a user has no config, the daemon should log + skip (not silently render someone else's heatmap).
 - **`auto` theme is polled per refresh tick, not event-driven.** Per `SPEC.md` §234. Don't add an `AppleInterfaceThemeChangedNotification` observer; the polling design is intentional.
-- **Custom themes load from `~/Library/Application Support/gh-wallpaper/themes/*.json`.** Each file decodes directly into a `Theme` (already `Codable`). Validation lives in `CustomThemes.swift`; failures log a warning and skip the file rather than crashing the daemon. User theme ids cannot shadow a built-in — built-ins always win in `Themes.byId(_:)`.
+- **Custom themes load from `~/Library/Application Support/gh-wallpaper/themes/*.json`.** Each file decodes directly into a `Theme` (already `Codable`). Validation lives in `CustomThemes.swift`; failures log a warning and skip the file rather than crashing the daemon. User theme ids cannot shadow a built-in — built-ins always win in `Themes.byId(_:)`. Custom themes can carry `backgroundImagePath` (relative paths resolve against the JSON file's directory) and `backgroundDimAlpha` for image backgrounds; the renderHash includes image mtime/size so disk-swapped images invalidate cleanly.
 
 ## What's stale vs what's live
 

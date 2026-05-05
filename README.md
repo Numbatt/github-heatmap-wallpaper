@@ -105,7 +105,6 @@ Drop a JSON file into `~/Library/Application Support/gh-wallpaper/themes/`. The 
 {
   "id": "aurora",
   "background": "#0b0f1a",
-  "backgroundIsGradient": false,
   "cellRamp": ["#1a2333", "#2e7d6b", "#56c596", "#8af3c5", "#c9ffe5"],
   "headlineColor": "#a78bfa"
 }
@@ -117,6 +116,25 @@ Drop a JSON file into `~/Library/Application Support/gh-wallpaper/themes/`. The 
 - Files that fail validation are logged once and skipped; they don't break the daemon.
 
 `gh-wallpaper themes` will list any custom themes alongside the built-ins.
+
+### Image backgrounds
+
+Any custom theme can put a photo behind the heatmap. Either pick one in the editor, or add the field by hand:
+
+```json
+{
+  "id": "my-photo",
+  "background": "#000000",
+  "cellRamp": ["#1a1a1a", "#2e7d6b", "#56c596", "#8af3c5", "#c9ffe5"],
+  "headlineColor": "#ffffff",
+  "backgroundImagePath": "images/my-photo.jpg",
+  "backgroundDimAlpha": 0.5
+}
+```
+
+- `backgroundImagePath` is an absolute path, `~/`-relative, or relative to the theme JSON file's directory. PNG and JPEG are supported.
+- `backgroundDimAlpha` (0.0–1.0, default 0.4) controls a translucent black overlay between the photo and the heatmap. Most photos look better with the dim around 0.4–0.6 — without it, busy textures swallow the lower-contribution cells.
+- The daemon hashes the image's path + mtime + size, so swapping the file in place triggers a re-render on the next refresh.
 
 ---
 
