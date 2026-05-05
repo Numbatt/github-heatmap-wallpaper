@@ -8,6 +8,7 @@ All notable changes to `gh-wallpaper` are recorded here. The format is loosely b
 - Five new built-in themes: `tokyo-night`, `dracula`, `nord`, `gruvbox-dark`, and `catppuccin-mocha`.
 - **Custom themes**: drop a JSON file in `~/Library/Application Support/gh-wallpaper/themes/`, then run `gh-wallpaper theme <id>`. Schema mirrors the built-in `Theme` struct (`id`, `background`, `cellRamp` [5 colors], `headlineColor`, optional `backgroundIsGradient` + `gradientSVG`). Validation rejects malformed files with a logged warning rather than crashing the daemon. See README for the schema.
 - New `gh-wallpaper themes` subcommand — lists all built-in and custom themes.
+- Daily install-analytics snapshot: `docs/install-stats.ndjson` accumulates per-day GitHub release-asset bottle download counts; `docs/INSTALL_STATS.md` and a README block are regenerated from it. Server-side only — no client telemetry was added. See [`docs/INSTALL_STATS.md`](docs/INSTALL_STATS.md) for methodology and the counting-model caveats.
 
 ### Removed
 - Themes `sunset` and `forest` — capping built-ins at 12 to keep the picker manageable. Users on those ids will fall back to `github-dark` automatically on the next refresh; switch with `gh-wallpaper theme <id>` to pick a replacement (`paper` is the closest warm-light alternative; `ocean` covers the cool-light slot).
