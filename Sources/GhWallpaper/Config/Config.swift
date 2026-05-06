@@ -36,12 +36,16 @@ public struct UserConfig: Equatable, Codable, Sendable {
             return .all  // unknown → safe default
         }
 
+        #if os(macOS)
         /// Returns the subset of `displays` that this mode targets. For
         /// `.mainOnly`, picks the display flagged `isMain` (or the first
         /// display as a fallback). For `.custom`, returns matches by UUID;
         /// if no UUIDs match (e.g. the configured display is currently
         /// disconnected), falls back to all so the user always sees *some*
         /// wallpaper.
+        ///
+        /// macOS-only: `DisplayInfo` and the multi-display flow live behind
+        /// `#if os(macOS)`. Linux is single-display + explicit `--canvas`.
         public func filter(_ displays: [DisplayInfo]) -> [DisplayInfo] {
             switch self {
             case .all:
@@ -57,6 +61,7 @@ public struct UserConfig: Equatable, Codable, Sendable {
                 return matched.isEmpty ? displays : matched
             }
         }
+        #endif
     }
 
     public init(

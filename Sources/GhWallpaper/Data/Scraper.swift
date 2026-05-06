@@ -1,4 +1,10 @@
 import Foundation
+// swift-corelibs-foundation moved URLSession into FoundationNetworking;
+// Apple Foundation keeps it in the umbrella import. The conditional
+// keeps both platforms building from one source.
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 public enum ScraperError: Error, CustomStringConvertible {
     case userNotFound(String)
