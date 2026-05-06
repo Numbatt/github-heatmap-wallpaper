@@ -1,3 +1,4 @@
+#if os(macOS)
 import AppKit
 import Foundation
 
@@ -496,3 +497,4 @@ fileprivate actor EventMailbox {
         }
     }
 }
+#endif

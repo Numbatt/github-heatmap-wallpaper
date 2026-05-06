@@ -1,3 +1,4 @@
+#if canImport(AppKit)
 import AppKit
 import Combine
 import Foundation
@@ -669,3 +670,4 @@ extension Color {
         return String(format: "#%02x%02x%02x%02x", r, g, b, a)
     }
 }
+#endif

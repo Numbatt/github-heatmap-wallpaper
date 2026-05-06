@@ -8,7 +8,14 @@ public enum RasterizerError: Error, CustomStringConvertible {
     public var description: String {
         switch self {
         case .resvgMissing:
+            #if os(macOS)
             return "resvg binary not found on PATH. Install with `brew install resvg`."
+            #else
+            return "resvg binary not found on PATH. Install with one of: " +
+                   "`sudo apt install resvg` (Debian/Ubuntu), " +
+                   "`sudo dnf install resvg` (Fedora), " +
+                   "`sudo pacman -S resvg` (Arch)."
+            #endif
         case .resvgFailed(let code, let stderr):
             return "resvg failed (exit \(code)): \(stderr)"
         case .ioError(let m):
@@ -21,10 +28,19 @@ public enum RasterizerError: Error, CustomStringConvertible {
 public struct Rasterizer {
     private let resvgPath: String
 
+    /// Absolute path to the resvg binary the rasterizer will invoke.
+    /// Exposed so `gh-wallpaper diagnose` can show it in bug reports.
+    public var path: String { resvgPath }
+
     public init(resvgPath: String? = nil) throws {
         if let p = resvgPath { self.resvgPath = p; return }
-        // Find resvg on PATH. Common locations: /opt/homebrew/bin/resvg, /usr/local/bin/resvg.
+        // Find resvg on PATH. Platform-specific common install locations are
+        // checked first (cheaper than spawning `which`); fall back to PATH lookup.
+        #if os(macOS)
         let candidates = ["/opt/homebrew/bin/resvg", "/usr/local/bin/resvg"]
+        #else
+        let candidates = ["/usr/bin/resvg", "/usr/local/bin/resvg"]
+        #endif
         if let found = candidates.first(where: { FileManager.default.isExecutableFile(atPath: $0) }) {
             self.resvgPath = found
         } else if let viaWhich = Self.which("resvg") {

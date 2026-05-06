@@ -1,3 +1,4 @@
+#if canImport(AppKit)
 import AppKit
 import Foundation
 
@@ -93,3 +94,4 @@ public struct PreviewRenderer {
         return ContributionCalendar(username: "preview", days: days)
     }
 }
+#endif

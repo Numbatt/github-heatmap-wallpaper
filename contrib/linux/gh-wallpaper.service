@@ -12,8 +12,13 @@ Type=oneshot
 Environment=GH_USER=
 Environment=GH_THEME=github-dark
 Environment=GH_CANVAS=2560x1440
-Environment=GH_OUTPUT=%h/.cache/gh-wallpaper/heatmap.png
-ExecStart=%h/.local/bin/heatmap.sh --user ${GH_USER} --theme ${GH_THEME} --canvas ${GH_CANVAS} --output ${GH_OUTPUT}
+Environment=GH_OUTPUT=%h/.cache/gh-wallpaper/wallpaper.png
+ExecStart=%h/.local/bin/gh-wallpaper render --user ${GH_USER} --theme ${GH_THEME} --canvas ${GH_CANVAS} --output ${GH_OUTPUT}
+# To set the wallpaper after each render, append a drop-in pointing at one
+# of the contrib/linux/examples/set-wallpaper-*.sh shims for your DE:
+#   systemctl --user edit gh-wallpaper.service
+#     [Service]
+#     ExecStartPost=%h/.local/bin/set-wallpaper-gnome.sh
 
 [Install]
 WantedBy=default.target

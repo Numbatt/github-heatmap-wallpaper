@@ -2,18 +2,65 @@ import Foundation
 
 /// Canonical filesystem paths used throughout gh-wallpaper.
 /// All of these live under the user's home directory; no system-wide files.
+///
+/// macOS keeps its existing layout under `~/Library/Application Support/gh-wallpaper/`
+/// (config + cache + state collapse to one directory). Linux follows the
+/// XDG Base Directory spec, splitting config / cache / state across separate
+/// directories.
 public enum Paths {
+
+    // MARK: - Platform-conditional roots
+
+    #if os(macOS)
+    /// macOS: `~/Library/Application Support/gh-wallpaper/`
     public static var supportDir: URL {
         URL(fileURLWithPath: NSHomeDirectory())
             .appendingPathComponent("Library/Application Support/gh-wallpaper", isDirectory: true)
     }
 
+    /// On macOS, cache state and config all live in supportDir.
+    public static var cacheDir: URL { supportDir }
+    public static var stateDir: URL { supportDir }
+    #else
+    /// Linux config root: `${XDG_CONFIG_HOME:-~/.config}/gh-wallpaper/`
+    public static var supportDir: URL {
+        xdgRoot(env: "XDG_CONFIG_HOME", fallback: ".config")
+    }
+
+    /// Linux cache root: `${XDG_CACHE_HOME:-~/.cache}/gh-wallpaper/`
+    public static var cacheDir: URL {
+        xdgRoot(env: "XDG_CACHE_HOME", fallback: ".cache")
+    }
+
+    /// Linux state root: `${XDG_STATE_HOME:-~/.local/state}/gh-wallpaper/`
+    public static var stateDir: URL {
+        xdgRoot(env: "XDG_STATE_HOME", fallback: ".local/state")
+    }
+
+    private static func xdgRoot(env: String, fallback: String) -> URL {
+        let envValue = ProcessInfo.processInfo.environment[env]
+        let base: URL
+        if let envValue, !envValue.isEmpty {
+            base = URL(fileURLWithPath: envValue)
+        } else {
+            base = URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent(fallback)
+        }
+        return base.appendingPathComponent("gh-wallpaper", isDirectory: true)
+    }
+    #endif
+
+    // MARK: - Files (platform-neutral, derived from the roots above)
+
     public static var configFile: URL {
-        supportDir.appendingPathComponent("config.toml")
+        #if os(macOS)
+        return supportDir.appendingPathComponent("config.toml")
+        #else
+        return supportDir.appendingPathComponent("config.toml")
+        #endif
     }
 
     public static var stateFile: URL {
-        supportDir.appendingPathComponent("state.json")
+        stateDir.appendingPathComponent("state.json")
     }
 
     /// Directory where users drop custom theme JSON files.
@@ -31,13 +78,14 @@ public enum Paths {
     }
 
     public static var previousWallpapersFile: URL {
-        supportDir.appendingPathComponent("previous-wallpapers.json")
+        stateDir.appendingPathComponent("previous-wallpapers.json")
     }
 
     public static func wallpaperPNG(displayUUID: String) -> URL {
-        supportDir.appendingPathComponent("wallpaper-\(displayUUID).png")
+        cacheDir.appendingPathComponent("wallpaper-\(displayUUID).png")
     }
 
+    #if os(macOS)
     public static var launchdPlist: URL {
         URL(fileURLWithPath: NSHomeDirectory())
             .appendingPathComponent("Library/LaunchAgents/dev.numbatt.gh-wallpaper.plist")
@@ -49,12 +97,36 @@ public enum Paths {
         URL(fileURLWithPath: NSHomeDirectory())
             .appendingPathComponent("Library/Logs/gh-wallpaper/agent.log")
     }
+    #else
+    /// Linux unit lives at `${XDG_CONFIG_HOME:-~/.config}/systemd/user/gh-wallpaper.service`.
+    /// The unit file isn't owned by the binary — it ships via `contrib/linux/install.sh` —
+    /// but the path is exposed here for the diagnose command.
+    public static var systemdUnitPath: URL {
+        let cfg = ProcessInfo.processInfo.environment["XDG_CONFIG_HOME"]
+        let base: URL
+        if let cfg, !cfg.isEmpty {
+            base = URL(fileURLWithPath: cfg)
+        } else {
+            base = URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent(".config")
+        }
+        return base.appendingPathComponent("systemd/user/gh-wallpaper.service")
+    }
 
-    /// Ensures the support directory exists. Idempotent.
+    public static let systemdUnitName = "gh-wallpaper.service"
+
+    public static var logFile: URL {
+        stateDir.appendingPathComponent("agent.log")
+    }
+    #endif
+
+    /// Ensures the relevant directories exist. Idempotent. Creates support,
+    /// cache, and state roots — on macOS these all collapse to one directory.
     @discardableResult
     public static func ensureSupportDir() throws -> URL {
-        let dir = supportDir
-        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        return dir
+        let fm = FileManager.default
+        try fm.createDirectory(at: supportDir, withIntermediateDirectories: true)
+        try fm.createDirectory(at: cacheDir, withIntermediateDirectories: true)
+        try fm.createDirectory(at: stateDir, withIntermediateDirectories: true)
+        return supportDir
     }
 }

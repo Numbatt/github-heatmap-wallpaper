@@ -1,4 +1,3 @@
-import AppKit
 import Foundation
 
 /// Subcommand dispatcher: maps `argv` to a `runX(...)` handler.
@@ -13,21 +12,35 @@ public enum Commands {
             Logger.shared.consoleMirror = .debug
         }
         guard let first = args.first else {
+            #if os(macOS)
             // `gh-wallpaper` with no args → wizard
             return await runWizard()
+            #else
+            // Linux has no interactive setup wizard; the systemd-driven
+            // install.sh writes config directly. Show help instead.
+            return printHelp()
+            #endif
         }
         switch first {
         case "--help", "-h", "help":     return printHelp()
-        case "--daemon", "daemon":       return await runDaemon()
         case "render":                   return await runRender(args: Array(args.dropFirst()))
-        case "refresh":                  return await runRefresh()
         case "theme":                    return await runTheme(args: Array(args.dropFirst()))
         case "themes":                   return await runThemes(args: Array(args.dropFirst()))
+        case "diagnose":                 return runDiagnose()
+        #if os(macOS)
+        case "--daemon", "daemon":       return await runDaemon()
+        case "refresh":                  return await runRefresh()
         case "pause":                    return runPause()
         case "start":                    return runStart()
         case "displays":                 return runDisplays()
-        case "diagnose":                 return runDiagnose()
         case "uninstall":                return runUninstall()
+        #else
+        case "--daemon", "daemon", "refresh", "pause", "start", "displays", "uninstall":
+            FileHandle.standardError.write(Data(
+                "`\(first)` is macOS-only. On Linux, control the systemd unit directly:\n  systemctl --user enable --now gh-wallpaper.timer\n  systemctl --user start gh-wallpaper.service\nSee contrib/linux/README.md.\n".utf8
+            ))
+            return 1
+        #endif
         default:
             // Convenience: `gh-wallpaper <username>` runs a one-shot render
             // for that user without touching saved config.
@@ -46,7 +59,11 @@ public enum Commands {
 
     /// Returns `true` for the two argv shapes that open the SwiftUI editor:
     /// `themes new …` and `theme <id> --edit`. Verbose flags are tolerated.
+    /// Always returns false on non-macOS — there is no editor on Linux.
     public static func isEditorInvocation(_ argv: [String]) -> Bool {
+        #if !os(macOS)
+        return false
+        #else
         let stripped = argv.dropFirst().filter { $0 != "-v" && $0 != "--verbose" }
         guard let first = stripped.first else { return false }
         let rest = stripped.dropFirst()
@@ -55,11 +72,18 @@ public enum Commands {
         case "themes": return rest.first == "new"
         default:       return false
         }
+        #endif
     }
 
     /// Synchronous dispatch for editor invocations. Caller must already be
     /// on the OS main thread (the `@main` entrypoint guarantees this).
     public static func dispatchEditorSync(_ argv: [String]) -> Int32 {
+        #if !os(macOS)
+        FileHandle.standardError.write(Data(
+            "the visual theme editor is macOS-only. On Linux, place a JSON file at \(Paths.customThemesDir.path) — see contrib/linux/README.md for the schema.\n".utf8
+        ))
+        return 1
+        #else
         var args = Array(argv.dropFirst())
         if let idx = args.firstIndex(where: { $0 == "-v" || $0 == "--verbose" }) {
             args.remove(at: idx)
@@ -76,10 +100,12 @@ public enum Commands {
         default:
             return 1
         }
+        #endif
     }
 
     // MARK: - Subcommands
 
+    #if os(macOS)
     private static func runWizard() async -> Int32 {
         do {
             _ = try await Wizard().run()
@@ -94,22 +120,27 @@ public enum Commands {
         await Daemon().run()
         return 0
     }
+    #endif
 
     private static func runRender(args: [String]) async -> Int32 {
         var username: String? = nil
         var themeID: String? = nil
+        var canvasArg: String? = nil
+        var outputArg: String? = nil
         var i = 0
         while i < args.count {
             switch args[i] {
-            case "--user":  username = args[safe: i + 1]; i += 2
-            case "--theme": themeID  = args[safe: i + 1]; i += 2
+            case "--user":   username   = args[safe: i + 1]; i += 2
+            case "--theme":  themeID    = args[safe: i + 1]; i += 2
+            case "--canvas": canvasArg  = args[safe: i + 1]; i += 2
+            case "--output": outputArg  = args[safe: i + 1]; i += 2
             default: i += 1
             }
         }
         let config = try? ConfigStore.read()
         guard let user = username ?? config?.username else {
             FileHandle.standardError.write(Data(
-                "no GitHub username — pass `--user <name>` or run `gh-wallpaper` to set up.\n".utf8
+                "no GitHub username — pass `--user <name>` to render.\n".utf8
             ))
             return 1
         }
@@ -127,9 +158,96 @@ public enum Commands {
         } else {
             theme = config?.resolvedTheme() ?? Themes.githubDark
         }
+
+        // Explicit-canvas path: works on both platforms. `--canvas WxH
+        // --output PATH` skips display enumeration and writes one PNG.
+        if canvasArg != nil || outputArg != nil {
+            return await renderToCanvas(
+                username: user, theme: theme,
+                canvasArg: canvasArg, outputArg: outputArg
+            )
+        }
+
+        #if os(macOS)
         return await renderOneShot(username: user, theme: theme, setWallpaper: false)
+        #else
+        FileHandle.standardError.write(Data(
+            "on Linux, pass --canvas WxH --output PATH (auto-detection lands in a follow-up release).\nExample: gh-wallpaper render --user \(user) --canvas 2560x1440 --output ~/.cache/gh-wallpaper/wallpaper.png\n".utf8
+        ))
+        return 1
+        #endif
     }
 
+    /// Cross-platform single-canvas render: parse `--canvas WxH`, write one
+    /// PNG to `--output PATH`. No display enumeration, no wallpaper-set.
+    /// On Linux this is the only render path; on macOS it's an override that
+    /// skips multi-display logic when the user wants a specific PNG written.
+    private static func renderToCanvas(
+        username: String,
+        theme: Theme,
+        canvasArg: String?,
+        outputArg: String?
+    ) async -> Int32 {
+        guard let canvasArg else {
+            FileHandle.standardError.write(Data(
+                "--output requires --canvas WxH (e.g. --canvas 2560x1440)\n".utf8
+            ))
+            return 1
+        }
+        guard let (width, height) = parseCanvas(canvasArg) else {
+            FileHandle.standardError.write(Data(
+                "invalid --canvas: \(canvasArg) (expected WxH, e.g. 2560x1440)\n".utf8
+            ))
+            return 1
+        }
+        let outputPath: String
+        if let outputArg {
+            outputPath = outputArg
+        } else {
+            _ = try? Paths.ensureSupportDir()
+            outputPath = Paths.cacheDir.appendingPathComponent("wallpaper.png").path
+        }
+
+        do {
+            let scraper = Scraper()
+            print("→ fetching contributions for @\(username)…")
+            let calendar = try await scraper.fetch(username: username)
+            print("→ parsed \(calendar.days.count) days")
+
+            let rasterizer = try Rasterizer()
+            let builder = SVGBuilder()
+            let canvas = SVGBuilder.Canvas(widthPx: width, heightPx: height)
+            let svg = builder.build(calendar: calendar, theme: theme, canvas: canvas)
+
+            let outURL = URL(fileURLWithPath: outputPath)
+            // Ensure parent directory exists; users may pass a path under a
+            // not-yet-created directory (especially on Linux's XDG_CACHE_HOME).
+            try FileManager.default.createDirectory(
+                at: outURL.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+            try rasterizer.rasterize(svg: svg, toPNG: outURL, widthPx: width, heightPx: height)
+            print(outURL.path)
+            return 0
+        } catch {
+            FileHandle.standardError.write(Data("error: \(error)\n".utf8))
+            return 1
+        }
+    }
+
+    /// Parse `WxH` into `(width, height)`. Returns nil on malformed input or
+    /// out-of-range dimensions (each side must be 1..8192).
+    private static func parseCanvas(_ s: String) -> (Int, Int)? {
+        let parts = s.split(separator: "x", maxSplits: 1, omittingEmptySubsequences: false)
+        guard parts.count == 2,
+              let w = Int(parts[0]), let h = Int(parts[1]),
+              w > 0, h > 0, w <= 8192, h <= 8192 else {
+            return nil
+        }
+        return (w, h)
+    }
+
+    #if os(macOS)
     private static func runRefresh() async -> Int32 {
         guard let config = try? ConfigStore.read() else {
             FileHandle.standardError.write(Data("no config; run `gh-wallpaper` to set up\n".utf8))
@@ -146,6 +264,7 @@ public enum Commands {
             setWallpaper: true
         )
     }
+    #endif
 
     private static let builtinThemeIDs: Set<String> = Set(Themes.builtins.map(\.id) + ["auto"])
 
@@ -186,8 +305,14 @@ public enum Commands {
         config.themeID = id
         do {
             try ConfigStore.write(config)
+            #if os(macOS)
             print("→ theme set to \(id); refreshing wallpaper…")
             return await runRefreshOnce(config: config)
+            #else
+            print("→ theme set to \(id). The systemd timer will pick it up on next firing.")
+            print("  Apply now: `systemctl --user start gh-wallpaper.service`")
+            return 0
+            #endif
         } catch {
             FileHandle.standardError.write(Data("could not save config: \(error)\n".utf8))
             return 1
@@ -195,6 +320,7 @@ public enum Commands {
     }
 
     // MARK: - Sync editor handlers (called from dispatchEditorSync)
+    #if os(macOS)
 
     private static func runThemeEditSync(args: [String]) -> Int32 {
         var themeID: String? = nil
@@ -315,10 +441,13 @@ public enum Commands {
     private final class ResultBox: @unchecked Sendable {
         var value: Int32 = 1
     }
+    #endif  // os(macOS) — editor handlers
 
     /// `themes` (no verb) lists built-in + custom themes.
     /// `themes <verb>` dispatches to CRUD actions: delete / export / import.
-    /// (`themes new` is handled by `dispatchEditorSync` — see `runTheme` for why.)
+    /// (`themes new` is handled by `dispatchEditorSync` on macOS — see
+    /// `runTheme` for why. On Linux, "new" lands here and we point users at
+    /// the export-edit-reimport JSON workflow.)
     private static func runThemes(args: [String]) async -> Int32 {
         guard let verb = args.first else { return runThemesList() }
         let rest = Array(args.dropFirst())
@@ -326,6 +455,19 @@ public enum Commands {
         case "delete":  return runThemesDelete(args: rest)
         case "export":  return runThemesExport(args: rest)
         case "import":  return runThemesImport()
+        case "new":
+            #if os(macOS)
+            // On macOS this is normally caught by isEditorInvocation upstream.
+            FileHandle.standardError.write(Data(
+                "internal: themes new should have been routed to the editor\n".utf8
+            ))
+            return 1
+            #else
+            FileHandle.standardError.write(Data(
+                "the visual editor is macOS-only. Create a custom theme on Linux by exporting + editing JSON:\n  gh-wallpaper themes export github-dark > \(Paths.customThemesDir.path)/my-theme.json\n  # edit my-theme.json (change \"id\", tweak colors)\n  gh-wallpaper themes\nSee contrib/linux/README.md for the schema.\n".utf8
+            ))
+            return 1
+            #endif
         default:
             FileHandle.standardError.write(Data(
                 "unknown verb: \(verb)\nusage: gh-wallpaper themes [new|delete|export|import] [...]\n".utf8
@@ -467,6 +609,7 @@ public enum Commands {
         }
     }
 
+    #if os(macOS)
     private static func runPause() -> Int32 {
         // Unload the launchd agent (gracefully — agent persists if reinstalled later).
         return LaunchAgent.pause()
@@ -497,20 +640,46 @@ public enum Commands {
         print("(change with `gh-wallpaper` to re-run the setup wizard)")
         return 0
     }
+    #endif
 
     private static func runDiagnose() -> Int32 {
         let config = try? ConfigStore.read()
         let state = StateStore.read()
-        let resvgPath: String = (try? Rasterizer().description) ?? "(rasterizer init failed — `brew install resvg`)"
+        let resvgPath: String
+        do {
+            let r = try Rasterizer()
+            resvgPath = "ok (\(r.path))"
+        } catch {
+            resvgPath = "(missing — \(error))"
+        }
 
         print("gh-wallpaper diagnose")
         print("─────────────────────")
-        print("config: \(ConfigStore.exists() ? Paths.configFile.path : "(not set up — run `gh-wallpaper`)")")
+        #if os(macOS)
+        print("platform: macOS")
+        #else
+        print("platform: Linux")
+        let env = ProcessInfo.processInfo.environment
+        let distro = readOSReleaseField("PRETTY_NAME") ?? "unknown"
+        print("  distro:        \(distro)")
+        print("  desktop:       \(env["XDG_CURRENT_DESKTOP"] ?? "(unset)")")
+        print("  session type:  \(env["XDG_SESSION_TYPE"] ?? "(unset)")")
+        print("  XDG_CONFIG:    \(env["XDG_CONFIG_HOME"] ?? "(default)")")
+        print("  XDG_CACHE:     \(env["XDG_CACHE_HOME"] ?? "(default)")")
+        print("  XDG_STATE:     \(env["XDG_STATE_HOME"] ?? "(default)")")
+        #endif
+
+        print("config: \(ConfigStore.exists() ? Paths.configFile.path : "(not set up)")")
         if let c = config {
             print("  username: \(c.username)")
             print("  theme: \(c.themeID)")
             print("  displays: \(c.displays.serialized)")
         }
+        print("paths:")
+        print("  config dir:   \(Paths.supportDir.path)")
+        print("  cache dir:    \(Paths.cacheDir.path)")
+        print("  state dir:    \(Paths.stateDir.path)")
+        print("  themes dir:   \(Paths.customThemesDir.path)")
         print("state:")
         if let last = state.lastRefreshAt {
             print("  last refresh: \(ISO8601DateFormatter().string(from: last))")
@@ -520,12 +689,38 @@ public enum Commands {
         print("  consecutive failures: \(state.consecutiveFailures)")
         if let err = state.lastError { print("  last error: \(err)") }
         print("rasterizer: \(resvgPath)")
+        #if os(macOS)
         print("launchd plist: \(FileManager.default.fileExists(atPath: Paths.launchdPlist.path) ? "installed" : "not installed")")
         print("displays: \(DisplayEnumerator.all().count)")
+        #else
+        print("systemd unit: \(FileManager.default.fileExists(atPath: Paths.systemdUnitPath.path) ? Paths.systemdUnitPath.path : "(not installed)")")
+        print("(see journalctl --user-unit=gh-wallpaper.service for runtime logs)")
+        #endif
         print("log: \(Paths.logFile.path)")
         return 0
     }
 
+    #if !os(macOS)
+    /// Best-effort reader for `/etc/os-release` fields. Returns nil if the
+    /// file or key isn't present. Strips surrounding quotes from the value.
+    private static func readOSReleaseField(_ key: String) -> String? {
+        guard let content = try? String(contentsOfFile: "/etc/os-release", encoding: .utf8) else {
+            return nil
+        }
+        for line in content.split(separator: "\n") {
+            let parts = line.split(separator: "=", maxSplits: 1, omittingEmptySubsequences: false)
+            guard parts.count == 2, parts[0] == Substring(key) else { continue }
+            var v = String(parts[1])
+            if v.hasPrefix("\"") && v.hasSuffix("\"") && v.count >= 2 {
+                v = String(v.dropFirst().dropLast())
+            }
+            return v
+        }
+        return nil
+    }
+    #endif
+
+    #if os(macOS)
     private static func runUninstall() -> Int32 {
         print("uninstalling gh-wallpaper…")
 
@@ -551,7 +746,7 @@ public enum Commands {
         return 0
     }
 
-    // MARK: - Render helper
+    // MARK: - Render helper (macOS multi-display, sets wallpaper)
 
     private static func renderOneShot(
         username: String,
@@ -621,18 +816,22 @@ public enum Commands {
             try? fm.removeItem(at: legacy)
         }
     }
+    #endif  // os(macOS) — runUninstall + renderOneShot + cleanupOldWallpapers
 
     // MARK: - Help
 
     private static func printHelp() -> Int32 {
+        #if os(macOS)
         print("""
-        gh-wallpaper — GitHub contribution heatmap as your macOS desktop wallpaper
+        gh-wallpaper — GitHub contribution heatmap as your desktop wallpaper
 
         Usage:
           gh-wallpaper                         Run setup wizard (or re-run to reconfigure)
           gh-wallpaper <username>              One-shot render for the given user
           gh-wallpaper render [--user X]       Render PNG to disk without setting wallpaper
                               [--theme T]
+                              [--canvas WxH]   Override display detection
+                              [--output PATH]  Write PNG to this path
           gh-wallpaper refresh                 Force an immediate refresh + set wallpaper
           gh-wallpaper theme <id>              Apply a theme (built-in or custom).
           gh-wallpaper theme <id> --edit       Open the editor seeded from <id>.
@@ -656,6 +855,33 @@ public enum Commands {
 
         Privacy: scrapes the public profile only. No PAT, no auth, no telemetry.
         """)
+        #else
+        print("""
+        gh-wallpaper — GitHub contribution heatmap as your desktop wallpaper (Linux beta)
+
+        Usage:
+          gh-wallpaper render --user X --canvas WxH --output PATH
+                                                Render PNG to PATH at the given canvas size
+                                                (e.g. --canvas 2560x1440 --output ~/.cache/gh-wallpaper/wallpaper.png)
+                              [--theme T]       Override saved theme for this render only
+          gh-wallpaper theme <id>               Set the active theme in config (next render uses it)
+          gh-wallpaper themes                   List built-in + custom themes
+          gh-wallpaper themes export <id>       Print theme JSON to stdout (works for built-ins)
+          gh-wallpaper themes import            Read theme JSON from stdin and save it
+          gh-wallpaper themes delete <id>       Remove a custom theme
+          gh-wallpaper diagnose                 Print platform info + paths + state for bug reports
+
+        On Linux gh-wallpaper renders to a PNG; a per-DE shell snippet (see
+        contrib/linux/examples/) sets it as the wallpaper, and a systemd user
+        timer drives the refresh cadence. The visual theme editor and
+        long-running event-driven daemon are macOS-only for now.
+
+        Setup:  curl -fsSL https://raw.githubusercontent.com/Numbatt/github-heatmap-wallpaper/main/contrib/linux/install.sh | bash
+        Bugs:   https://github.com/Numbatt/github-heatmap-wallpaper/issues
+
+        Pass -v / --verbose to mirror debug logs to stderr.
+        """)
+        #endif
         return 0
     }
 }
@@ -666,8 +892,4 @@ private extension Array {
     subscript(safe i: Int) -> Element? {
         return indices.contains(i) ? self[i] : nil
     }
-}
-
-private extension Rasterizer {
-    var description: String { "ok (resvg available)" }
 }

@@ -62,7 +62,7 @@ End-to-end "I pushed a commit and saw it land on my wallpaper" latency on AC: me
 ## 4. Audience & distribution
 
 - **Anyone can use it.** No signup, no accounts, no hosted backend. 100% local.
-- **macOS only** for v1. Targets macOS 13 (Ventura) or newer. No Windows, no Linux.
+- **macOS first.** Targets macOS 13 (Ventura) or newer. As of 2026-05-05, the Swift library also compiles on Linux as a beta — `gh-wallpaper render` produces the same PNG, the systemd timer drives the cadence, per-DE shell shims apply the wallpaper. The macOS-only daemon, visual editor, and multi-display logic are out of Linux scope for now (see [`contrib/linux/README.md`](contrib/linux/README.md)). No Windows.
 - **Public OSS, repo only.** GitHub repo with a README. No separate landing page (yet).
 - **License:** MIT.
 - **Code signing:** none. The binary is unsigned. We rely on Homebrew's quarantine-flag exemption to avoid Gatekeeper friction (see below). No Apple Developer Program membership required from the maintainer.
@@ -386,7 +386,8 @@ Could not restore on:
 
 ### Out of scope (v1)
 
-- Windows or Linux support
+- Windows support
+- Linux daemon (event-driven), multi-display, HiDPI auto-scale, visual theme editor — Linux runs as a render-only Swift binary driven by a systemd timer, with per-DE shell shims for wallpaper-setting (see [`contrib/linux/README.md`](contrib/linux/README.md)). The richer features stay on the macOS-first roadmap.
 - Hosted / cloud-rendered version
 - Account systems, OAuth flow, sign-in
 - Any GitHub PAT path (revisit only if a real user wants "private contribs on wallpaper but not on profile")

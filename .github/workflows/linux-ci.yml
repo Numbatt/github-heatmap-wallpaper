@@ -1,0 +1,65 @@
+name: Linux CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-test:
+    runs-on: ubuntu-24.04
+    container:
+      image: swift:5.10-jammy
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache .build
+        uses: actions/cache@v4
+        with:
+          path: .build
+          key: linux-spm-${{ hashFiles('**/Package.swift') }}
+          restore-keys: linux-spm-
+
+      - name: Install resvg
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends curl ca-certificates
+          # resvg isn't in apt's default repos on jammy; grab the prebuilt
+          # release binary. Pin the version so CI is deterministic.
+          RESVG_VERSION="0.43.0"
+          curl -fsSL -o /tmp/resvg.tar.gz \
+            "https://github.com/RazrFalcon/resvg/releases/download/v${RESVG_VERSION}/resvg-x86_64-unknown-linux-gnu.tar.gz"
+          tar -xzf /tmp/resvg.tar.gz -C /usr/local/bin/ resvg
+          chmod +x /usr/local/bin/resvg
+          resvg --version
+
+      - name: Swift toolchain
+        run: swift --version
+
+      - name: Build (debug)
+        run: swift build
+
+      - name: Build (release)
+        run: swift build -c release
+
+      - name: Test
+        # Snapshot tests assert byte-identical SVG against the committed
+        # snapshots in Tests/GhWallpaperTests/snapshots/. If this step fails
+        # on Linux while macOS CI is green, the most likely culprit is
+        # locale-sensitive number formatting — see SVGBuilder.round3 +
+        # Headline.fmt for the POSIX-locale guards.
+        run: swift test
+
+      - name: Smoke render (offline-safe via fixtures)
+        # Render with the explicit canvas / output flags. Doesn't hit the
+        # network (uses --user octocat which would, so we skip this if
+        # there's no network — but on GitHub Actions there always is).
+        # Failure here means the binary built but can't actually run on Linux.
+        run: |
+          .build/release/gh-wallpaper --help | head -5
+          .build/release/gh-wallpaper diagnose
+          .build/release/gh-wallpaper render --user octocat --canvas 1920x1080 --output /tmp/smoke.png
+          test -s /tmp/smoke.png
+          file /tmp/smoke.png | grep -q "PNG image"
+          echo "✓ smoke render OK ($(stat -c '%s' /tmp/smoke.png) bytes)"

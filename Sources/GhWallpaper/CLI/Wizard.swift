@@ -1,3 +1,4 @@
+#if os(macOS)
 import Foundation
 
 /// First-run + reconfigure flow. Re-runnable, non-destructive (pre-fills
@@ -344,3 +345,4 @@ public struct Wizard {
         }
     }
 }
+#endif

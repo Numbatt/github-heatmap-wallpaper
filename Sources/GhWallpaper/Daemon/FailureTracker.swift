@@ -1,3 +1,4 @@
+#if os(macOS)
 import Foundation
 import UserNotifications
 
@@ -96,3 +97,4 @@ public final class UNUserNotificationsNotifier: Notifier, @unchecked Sendable {
         }
     }
 }
+#endif
