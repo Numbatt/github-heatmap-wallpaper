@@ -4,6 +4,8 @@ How to cut a new version, build bottles, update both formula copies, and verify 
 
 > **`/ship` is not enough.** `/ship` handles the git side of pushing code (commit, push, PR). It does **not** tag a release, build bottles, or update the Homebrew tap. For a real Homebrew release you need this runbook.
 
+> **Linux is not part of the release pipeline.** The bottles + tap dance is macOS-only. Linux users `git clone` the repo at the latest tag and run `contrib/linux/install.sh` — they don't pull from Homebrew. So a release is "macOS bottle ships, Linux git tag exists for users who want to pin." Tagging a version is enough; no extra Linux step.
+
 ## TL;DR
 
 ```sh

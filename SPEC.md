@@ -1,6 +1,6 @@
 # gh-wallpaper
 
-A macOS desktop wallpaper that mirrors your GitHub contribution heatmap, refreshed automatically. Drop in a GitHub username and your desktop becomes a living poster of your last year of shipping.
+A desktop wallpaper that mirrors your GitHub contribution heatmap, refreshed automatically. macOS is the primary target; a Linux beta runs the same renderer via a systemd timer (see §4 and [`contrib/linux/README.md`](contrib/linux/README.md)). Drop in a GitHub username and your desktop becomes a living poster of your last year of shipping.
 
 ---
 

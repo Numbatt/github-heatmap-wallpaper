@@ -1,6 +1,6 @@
 # gh-wallpaper
 
-Your GitHub contribution heatmap as your macOS desktop wallpaper. Refreshes itself in the background so your desktop always reflects what you've shipped this year.
+Your GitHub contribution heatmap as your desktop wallpaper. Built for macOS; Linux beta available — same renderer, same headline. Refreshes itself in the background so your desktop always reflects what you've shipped this year.
 
 ![Wallpaper preview](image.png)
 
@@ -34,6 +34,16 @@ cd github-heatmap-wallpaper
 ```
 
 `install.sh` checks for the Swift toolchain and `resvg`, builds the release binary, and copies it into your Homebrew prefix (or `/usr/local/bin`).
+
+### On Linux
+
+```sh
+git clone https://github.com/Numbatt/github-heatmap-wallpaper
+cd github-heatmap-wallpaper
+./contrib/linux/install.sh
+```
+
+See the [Linux (beta) section](#linux-beta) below for the post-install steps (set username, pick wallpaper-setter, enable timer).
 
 Then run the wizard:
 
@@ -226,12 +236,16 @@ cd github-heatmap-wallpaper
 
 ## Requirements
 
-**macOS app:**
+**macOS:**
 - macOS 14 (Sonoma) or newer
 - [`resvg`](https://github.com/RazrFalcon/resvg) on your `PATH` (`brew install resvg` — Homebrew installs this transitively)
 - If building from source: Swift 5.7+ (Apple's Command Line Tools are enough — `xcode-select --install`; no full Xcode required)
 
-**Linux recipe:** see [`contrib/linux/README.md`](contrib/linux/README.md). Just `curl` + `librsvg2-bin` (or your distro's equivalent) + systemd.
+**Linux (beta):**
+- Any modern systemd-based distro (Debian/Ubuntu, Fedora, Arch tested via CI)
+- `resvg` (apt/dnf/pacman, or `install.sh` falls back to a pinned upstream binary)
+- Swift 5.10+ (`install.sh` auto-installs via swiftly if absent)
+- `install.sh` handles all of the above; see [`contrib/linux/README.md`](contrib/linux/README.md). The original `curl` + `librsvg2-bin` bash recipe stays as a no-toolchain fallback (heatmap-only, no headline).
 
 ---
 
