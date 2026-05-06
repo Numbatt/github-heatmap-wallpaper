@@ -14,12 +14,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Cache .build
-        uses: actions/cache@v4
-        with:
-          path: .build
-          key: linux-spm-${{ hashFiles('**/Package.swift') }}
-          restore-keys: linux-spm-
+      # Note: skipping actions/cache here — the GitHub-hosted runner +
+      # `container:` combo causes hashFiles to fail (host can't read
+      # files that the container mounts as root). Cold builds take ~90s,
+      # acceptable for the cadence. Revisit if it gets noisy.
 
       - name: Install resvg
         run: |
