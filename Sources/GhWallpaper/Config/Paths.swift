@@ -43,9 +43,22 @@ public enum Paths {
         if let envValue, !envValue.isEmpty {
             base = URL(fileURLWithPath: envValue)
         } else {
-            base = URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent(fallback)
+            base = URL(fileURLWithPath: linuxHome()).appendingPathComponent(fallback)
         }
         return base.appendingPathComponent("gh-wallpaper", isDirectory: true)
+    }
+
+    /// Linux home directory. Prefers `$HOME` over `NSHomeDirectory()` because
+    /// `NSHomeDirectory()` reads from the passwd database (`getpwuid(getuid())`),
+    /// which can disagree with `$HOME` in containers, GitHub Actions runners,
+    /// and sudo-like contexts. Systemd's `%h` resolves via `$HOME`, so for
+    /// the systemd-unit and XDG paths to agree with what the user manager
+    /// expects, we follow the same convention.
+    private static func linuxHome() -> String {
+        if let home = ProcessInfo.processInfo.environment["HOME"], !home.isEmpty {
+            return home
+        }
+        return NSHomeDirectory()
     }
     #endif
 
@@ -107,7 +120,7 @@ public enum Paths {
         if let cfg, !cfg.isEmpty {
             base = URL(fileURLWithPath: cfg)
         } else {
-            base = URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent(".config")
+            base = URL(fileURLWithPath: linuxHome()).appendingPathComponent(".config")
         }
         return base.appendingPathComponent("systemd/user/gh-wallpaper.service")
     }
