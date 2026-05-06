@@ -2,6 +2,20 @@
 
 All notable changes to `gh-wallpaper` are recorded here. The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project follows semver.
 
+## [0.2.2] — 2026-05-06
+
+### Added
+- **`gh-wallpaper init`** — interactive Linux post-install setup. Walks through username / theme / canvas / wallpaper-setter, writes a systemd drop-in (`~/.config/systemd/user/gh-wallpaper.service.d/override.conf`), enables the timer, and renders once. The Linux analog of the macOS wizard. Auto-detects canvas (swaymsg / wlr-randr / xrandr) and the wallpaper-setter (`$XDG_CURRENT_DESKTOP`). Re-runnable; `--no-enable` skips systemctl for containers/CI/scripts.
+- `gh-wallpaper diagnose` now prints the override drop-in path on Linux so users can see at a glance whether `init` has been run.
+- Linux CI gains a smoke step that runs `init --no-enable` against a piped input and asserts the drop-in lands on disk with the right values.
+
+### Fixed
+- **Shim/unit path mismatch**: the wallpaper-setter shims (`set-wallpaper-{gnome,kde,xfce,feh,swaybg}.sh`) defaulted to `~/.cache/gh-wallpaper/heatmap.png`, but the systemd unit writes to `wallpaper.png` — so the README's no-arg `ExecStartPost=…shim.sh` pattern silently set a non-existent file on every DE. Unified on `wallpaper.png` across all 5 shims and `heatmap.sh`.
+- **`Paths.linuxHome()`**: `NSHomeDirectory()` reads from the passwd database (`getpwuid`), which can disagree with `$HOME` in containers, sandboxes, and sudo-like contexts. systemd's `%h` always uses `$HOME`. Result before the fix: `init` could write `override.conf` to `/root/.config/...` while systemd looked in `$HOME/.config/...` — silent mismatch. Now Linux paths prefer `$HOME` and fall back to `NSHomeDirectory()`. macOS unchanged.
+
+### Changed
+- `install.sh` trailer + `contrib/linux/README.md` now point users at `gh-wallpaper init` instead of `systemctl --user edit gh-wallpaper.service`. The "run the wizard" hint moved out of the Linux section in the top-level README (the wizard is macOS-only).
+
 ## [0.2.1] — 2026-05-06
 
 ### Added
