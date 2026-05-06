@@ -1,3 +1,4 @@
+#if os(macOS)
 import Foundation
 
 /// Generates and registers the per-user launchd agent that runs `gh-wallpaper --daemon`.
@@ -192,3 +193,4 @@ public enum LaunchAgent {
         }
     }
 }
+#endif

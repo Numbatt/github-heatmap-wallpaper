@@ -134,7 +134,10 @@ public struct SVGBuilder: Sendable {
     }
 
     private func round3(_ v: Double) -> String {
-        return String(format: "%.3f", v)
+        // POSIX locale forces "." as the decimal separator on every platform.
+        // swift-corelibs-foundation's String(format:) honors LC_NUMERIC, so a
+        // German locale would emit "1,234" and produce invalid SVG.
+        return String(format: "%.3f", locale: Locale(identifier: "en_US_POSIX"), v)
     }
 
     /// Escapes characters that would break an XML attribute value.

@@ -1,3 +1,4 @@
+#if os(macOS)
 import AppKit
 import Foundation
 
@@ -232,3 +233,5 @@ public struct CaptureRestore {
         }
     }
 }
+
+#endif

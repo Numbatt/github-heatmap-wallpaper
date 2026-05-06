@@ -1,3 +1,4 @@
+#if os(macOS)
 import AppKit
 import CoreGraphics
 import Foundation
@@ -62,3 +63,4 @@ public enum DisplayEnumerator {
         return cfStr as String
     }
 }
+#endif

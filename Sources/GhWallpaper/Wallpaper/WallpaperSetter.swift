@@ -1,3 +1,4 @@
+#if os(macOS)
 import AppKit
 import Foundation
 
@@ -44,3 +45,4 @@ public struct WallpaperSetter {
         return NSWorkspace.shared.desktopImageURL(for: screen)
     }
 }
+#endif

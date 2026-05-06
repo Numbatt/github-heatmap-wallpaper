@@ -2,6 +2,19 @@
 
 All notable changes to `gh-wallpaper` are recorded here. The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project follows semver.
 
+## [Unreleased]
+
+### Added
+- **Linux support (beta).** The Swift library now compiles on Linux. `gh-wallpaper render --user X --canvas WxH --output PATH` produces the same PNG (heatmap + DESIGN BUILD SHIP headline) as the macOS app, with all 11 themes and custom JSON themes available. A new `contrib/linux/install.sh` handles dependencies (resvg, Swift toolchain), builds from source, and drops the systemd user units. Existing per-DE wallpaper-setter shims (GNOME / KDE / XFCE / sway / Hyprland / X11+feh) carry over unchanged. The macOS-only daemon, visual editor, and multi-display rendering are out of scope for the Linux beta — Linux runs as a render-only binary driven by the systemd timer.
+- `gh-wallpaper render` accepts `--canvas WxH` and `--output PATH` on both platforms — explicit overrides for users who want a one-off render at a specific size.
+- `gh-wallpaper diagnose` is now Linux-aware, emitting distro / desktop / session-type / XDG paths / systemd unit status — a copy-pasteable block intended for bug reports. Issue template at `.github/ISSUE_TEMPLATE/linux-bug.md` requires this output.
+- Linux CI workflow (`.github/workflows/linux-ci.yml`) builds against `swift:5.10-jammy`, runs `swift test` (snapshot byte-equality must match macOS), and smoke-renders against octocat.
+- `Paths.swift` now follows XDG on Linux (`$XDG_CONFIG_HOME` / `$XDG_CACHE_HOME` / `$XDG_STATE_HOME`); macOS layout is unchanged.
+
+### Changed
+- `contrib/linux/gh-wallpaper.service` now invokes the Swift binary (`gh-wallpaper render`) instead of `heatmap.sh`. The bash recipe is preserved as a no-toolchain fallback (no headline, 5 themes), demoted to a "Fallback" section in the Linux README.
+- `SVGBuilder.round3` and `Headline.fmt` now pass `Locale(identifier: "en_US_POSIX")` to `String(format:)` — this is a no-op on macOS (snapshot bytes unchanged) but defends against `swift-corelibs-foundation` honoring `LC_NUMERIC` on Linux, which would emit comma-decimals and break SVG.
+
 ## [0.2.0] — 2026-05-05
 
 ### Added

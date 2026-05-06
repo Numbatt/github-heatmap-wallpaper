@@ -1,3 +1,4 @@
+#if os(macOS)
 import AppKit
 import CoreGraphics
 import Foundation
@@ -157,3 +158,4 @@ public final class Observers: @unchecked Sendable {
         // safe.
     }
 }
+#endif

@@ -1,3 +1,4 @@
+#if os(macOS)
 import Foundation
 import IOKit.ps
 import Network
@@ -146,3 +147,4 @@ public final class AdaptiveTimer: @unchecked Sendable {
         return false
     }
 }
+#endif

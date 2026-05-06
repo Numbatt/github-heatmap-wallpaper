@@ -1,3 +1,4 @@
+#if os(macOS)
 import XCTest
 @testable import GhWallpaper
 
@@ -19,3 +20,4 @@ final class CaptureRestoreTests: XCTestCase {
         XCTAssertEqual(decoded.imagePath, "/Users/example/Pictures/sunset.jpg")
     }
 }
+#endif

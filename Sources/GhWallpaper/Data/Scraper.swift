@@ -1,4 +1,11 @@
 import Foundation
+// swift-corelibs-foundation moved URLSession into FoundationNetworking;
+// Apple Foundation keeps it in the umbrella import. `@preconcurrency`
+// suppresses the Linux-only warning that URLSession isn't Sendable
+// (Apple Foundation's URLSession is Sendable; swift-corelibs isn't yet).
+#if canImport(FoundationNetworking)
+@preconcurrency import FoundationNetworking
+#endif
 
 public enum ScraperError: Error, CustomStringConvertible {
     case userNotFound(String)
@@ -38,7 +45,11 @@ public struct Scraper: Sendable {
 
         let (data, response): (Data, URLResponse)
         do {
-            (data, response) = try await session.data(for: req)
+            // Apple Foundation has `URLSession.data(for:)` (async); the
+            // FoundationNetworking shipped in swift:5.10-jammy doesn't.
+            // The dataTask + continuation wrapper works on every Foundation
+            // implementation and platform Swift Concurrency runs on.
+            (data, response) = try await Self.fetchData(session: session, request: req)
         } catch {
             throw ScraperError.networkError(error)
         }
@@ -56,6 +67,29 @@ public struct Scraper: Sendable {
         }
         let days = try parser.parse(html: html)
         return ContributionCalendar(username: username, days: Self.dropFutureDays(days))
+    }
+
+    /// Portable async wrapper around `URLSession.dataTask`. Bridges the
+    /// completion-handler API into Swift Concurrency on platforms whose
+    /// Foundation lacks the native `URLSession.data(for:)` async method.
+    private static func fetchData(
+        session: URLSession,
+        request: URLRequest
+    ) async throws -> (Data, URLResponse) {
+        try await withCheckedThrowingContinuation { continuation in
+            let task = session.dataTask(with: request) { data, response, error in
+                if let error {
+                    continuation.resume(throwing: error)
+                    return
+                }
+                guard let data, let response else {
+                    continuation.resume(throwing: URLError(.badServerResponse))
+                    return
+                }
+                continuation.resume(returning: (data, response))
+            }
+            task.resume()
+        }
     }
 
     /// GitHub's anonymous HTML reports dates in UTC, which can include a cell

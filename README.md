@@ -1,6 +1,6 @@
 # gh-wallpaper
 
-Your GitHub contribution heatmap as your macOS desktop wallpaper. Refreshes itself in the background so your desktop always reflects what you've shipped this year.
+Your GitHub contribution heatmap as your desktop wallpaper. Built for macOS; Linux beta available — same renderer, same headline. Refreshes itself in the background so your desktop always reflects what you've shipped this year.
 
 ![Wallpaper preview](image.png)
 
@@ -34,6 +34,16 @@ cd github-heatmap-wallpaper
 ```
 
 `install.sh` checks for the Swift toolchain and `resvg`, builds the release binary, and copies it into your Homebrew prefix (or `/usr/local/bin`).
+
+### On Linux
+
+```sh
+git clone https://github.com/Numbatt/github-heatmap-wallpaper
+cd github-heatmap-wallpaper
+./contrib/linux/install.sh
+```
+
+See the [Linux (beta) section](#linux-beta) below for the post-install steps (set username, pick wallpaper-setter, enable timer).
 
 Then run the wizard:
 
@@ -200,44 +210,42 @@ If you want private contributions on the wallpaper, toggle GitHub's "Include pri
 
 ---
 
-## Linux (community recipe)
+## Linux (beta)
 
-The macOS app doesn't run on Linux — it's built on AppKit and launchd. But the heatmap render is portable enough that a ~180-line shell script (`curl` + `rsvg-convert`) plus a systemd user timer gets you the spirit of the project: your wallpaper is your GitHub heatmap, and it refreshes itself hourly.
+The Swift binary that powers the macOS app now compiles on Linux. You get the **same renderer**, the **DESIGN BUILD SHIP headline included**, and **all 11 built-in themes**. The systemd timer drives the refresh cadence; per-DE shell snippets apply the resulting PNG.
 
-**What you get:** the 53×7 heatmap grid in 5 themes (`github-dark`, `github-light`, `catppuccin-mocha`, `dracula`, `tokyo-night`); a render-only systemd oneshot + hourly timer; per-DE wallpaper-setter snippets for GNOME, KDE Plasma 6, XFCE, Sway, Hyprland, and X11.
+**What you get:** identical render output to the macOS app (same `SVGBuilder` + `Headline` code path); 11 built-in themes; custom JSON themes + image backgrounds; one-paste install via `install.sh`; per-DE wallpaper-setter shims for GNOME, KDE Plasma 6, XFCE, sway, Hyprland, X11.
 
-**What you don't get:** the "DESIGN BUILD SHIP" headline (the heatmap is the iconic part — porting hand-designed glyphs to shell isn't worth the maintenance cost), custom JSON themes, image backgrounds, multi-display awareness, the visual editor, or any kind of support contract. This is a community recipe — best-effort.
+**Coming later (v2):** long-running event-driven daemon (refresh on wake / network-up / display-change), multi-display rendering, HiDPI auto-detect, visual theme editor. The macOS app has these; the Linux build is starting with the basics and will fill in based on user feedback.
 
-Quickstart (Debian/Ubuntu, GNOME):
+**Beta caveat:** the maintainer ships from macOS and can't test every distro × DE combination. If anything misbehaves, run `gh-wallpaper diagnose` and [open an issue](https://github.com/Numbatt/github-heatmap-wallpaper/issues/new?template=linux-bug.md) — the diagnose output makes triage fast.
+
+Install (Debian/Ubuntu, Fedora, Arch):
 
 ```sh
-sudo apt install -y curl librsvg2-bin
 git clone https://github.com/Numbatt/github-heatmap-wallpaper
 cd github-heatmap-wallpaper
-install -Dm755 contrib/linux/heatmap.sh                      ~/.local/bin/heatmap.sh
-install -Dm755 contrib/linux/examples/set-wallpaper-gnome.sh ~/.local/bin/set-wallpaper-gnome.sh
-install -Dm644 contrib/linux/gh-wallpaper.{service,timer}    ~/.config/systemd/user/
-systemctl --user edit gh-wallpaper.service
-# in the editor, paste:
-#   [Service]
-#   Environment=GH_USER=your-github-username
-#   ExecStartPost=%h/.local/bin/set-wallpaper-gnome.sh
-systemctl --user daemon-reload
-systemctl --user enable --now gh-wallpaper.timer
+./contrib/linux/install.sh
 ```
 
-For KDE / XFCE / Sway / Hyprland / X11, see [`contrib/linux/README.md`](contrib/linux/README.md) — it has the per-DE walkthroughs, troubleshooting tips, and one important Wayland gotcha (don't run `swaybg` from a oneshot — see the contrib README for the right pattern).
+`install.sh` installs `resvg`, installs the Swift toolchain (via swiftly) if absent, builds gh-wallpaper from source, and drops the systemd units in place. After it finishes, set your username + canvas + wallpaper-setter and enable the timer — see [`contrib/linux/README.md`](contrib/linux/README.md) for the per-DE walkthroughs.
+
+**No Swift toolchain on your machine?** The original ~180-line bash recipe (`heatmap.sh`) is still here as a fallback — heatmap-only, 5 themes, no headline. See the contrib README's "Fallback" section.
 
 ---
 
 ## Requirements
 
-**macOS app:**
+**macOS:**
 - macOS 14 (Sonoma) or newer
 - [`resvg`](https://github.com/RazrFalcon/resvg) on your `PATH` (`brew install resvg` — Homebrew installs this transitively)
 - If building from source: Swift 5.7+ (Apple's Command Line Tools are enough — `xcode-select --install`; no full Xcode required)
 
-**Linux recipe:** see [`contrib/linux/README.md`](contrib/linux/README.md). Just `curl` + `librsvg2-bin` (or your distro's equivalent) + systemd.
+**Linux (beta):**
+- Any modern systemd-based distro (Debian/Ubuntu, Fedora, Arch tested via CI)
+- `resvg` (apt/dnf/pacman, or `install.sh` falls back to a pinned upstream binary)
+- Swift 5.10+ (`install.sh` auto-installs via swiftly if absent)
+- `install.sh` handles all of the above; see [`contrib/linux/README.md`](contrib/linux/README.md). The original `curl` + `librsvg2-bin` bash recipe stays as a no-toolchain fallback (heatmap-only, no headline).
 
 ---
 

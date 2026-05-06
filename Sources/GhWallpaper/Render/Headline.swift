@@ -93,5 +93,7 @@ func renderHeadline(
 }
 
 private func fmt(_ v: Double) -> String {
-    return String(format: "%.3f", v)
+    // POSIX locale: see SVGBuilder.round3 — keeps "." as the decimal separator
+    // on swift-corelibs-foundation Linux regardless of LC_NUMERIC.
+    return String(format: "%.3f", locale: Locale(identifier: "en_US_POSIX"), v)
 }
