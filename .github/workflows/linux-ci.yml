@@ -79,9 +79,12 @@ jobs:
           printf 'octocat\n1\n1920x1080\n4\n' \
             | .build/release/gh-wallpaper init --no-enable
           DROPIN="$HOME/.config/systemd/user/gh-wallpaper.service.d/override.conf"
+          echo "--- $DROPIN ---"
+          cat "$DROPIN" || echo "(file missing)"
+          echo "--- end ---"
           test -f "$DROPIN"
-          grep -q '^Environment=GH_USER=octocat$'         "$DROPIN"
-          grep -q '^Environment=GH_THEME=github-dark$'    "$DROPIN"
-          grep -q '^Environment=GH_CANVAS=1920x1080$'     "$DROPIN"
-          grep -q 'set-wallpaper-feh.sh'                  "$DROPIN"
+          grep -q '^Environment=GH_USER=octocat$'         "$DROPIN" || { echo "FAIL: GH_USER assertion"; exit 1; }
+          grep -q '^Environment=GH_THEME=github-dark$'    "$DROPIN" || { echo "FAIL: GH_THEME assertion"; exit 1; }
+          grep -q '^Environment=GH_CANVAS=1920x1080$'     "$DROPIN" || { echo "FAIL: GH_CANVAS assertion"; exit 1; }
+          grep -q 'set-wallpaper-feh.sh'                  "$DROPIN" || { echo "FAIL: setter assertion"; exit 1; }
           echo "✓ init wrote drop-in correctly"
