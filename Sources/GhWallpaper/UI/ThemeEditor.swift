@@ -585,13 +585,13 @@ private struct ColorRow<Trailing: View>: View {
     var body: some View {
         HStack {
             Text(label).frame(width: 110, alignment: .leading)
-            ColorPicker("", selection: $color, supportsOpacity: false)
+            ColorPicker("", selection: $color, supportsOpacity: true)
                 .labelsHidden()
                 .frame(width: 44)
-            TextField("#rrggbb", text: $hexText)
+            TextField("#rrggbb[aa]", text: $hexText)
                 .font(.system(.body, design: .monospaced))
                 .textFieldStyle(.roundedBorder)
-                .frame(width: 100)
+                .frame(width: 120)
                 .onAppear { hexText = color.hex }
                 // External update (e.g. ColorPicker) → resync the field,
                 // but only if the field doesn't already round-trip to the
@@ -652,17 +652,20 @@ extension Color {
         self.init(.sRGB, red: r, green: g, blue: b, opacity: a)
     }
 
-    /// `#rrggbb` representation in sRGB. SwiftUI `Color` conversions can
-    /// drift slightly across color spaces; we stay in sRGB for parity with
-    /// CSS and resvg.
+    /// `#rrggbb` (or `#rrggbbaa` when alpha < 1) in sRGB. SwiftUI `Color`
+    /// conversions can drift slightly across color spaces; we stay in sRGB
+    /// for parity with CSS and resvg. Alpha is preserved so themes whose
+    /// ramp varies by opacity (e.g. `paper`'s single-ink alpha scale)
+    /// round-trip through the editor without collapsing to one color.
     var hex: String {
         let ns = NSColor(self).usingColorSpace(.sRGB) ?? NSColor.black
-        let r = Int((ns.redComponent * 255).rounded())
-        let g = Int((ns.greenComponent * 255).rounded())
-        let b = Int((ns.blueComponent * 255).rounded())
-        return String(format: "#%02x%02x%02x",
-                      max(0, min(255, r)),
-                      max(0, min(255, g)),
-                      max(0, min(255, b)))
+        let r = max(0, min(255, Int((ns.redComponent * 255).rounded())))
+        let g = max(0, min(255, Int((ns.greenComponent * 255).rounded())))
+        let b = max(0, min(255, Int((ns.blueComponent * 255).rounded())))
+        let a = max(0, min(255, Int((ns.alphaComponent * 255).rounded())))
+        if a == 255 {
+            return String(format: "#%02x%02x%02x", r, g, b)
+        }
+        return String(format: "#%02x%02x%02x%02x", r, g, b, a)
     }
 }
