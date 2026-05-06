@@ -29,11 +29,24 @@ The Swift binary that powers the macOS app now compiles on Linux too. You get th
 git clone https://github.com/Numbatt/github-heatmap-wallpaper
 cd github-heatmap-wallpaper
 ./contrib/linux/install.sh
+gh-wallpaper init
 ```
 
-`install.sh` handles dependencies (`resvg`, Swift toolchain), builds the binary, and drops the systemd units in place. It does **not** auto-enable the timer — you need to set your username and pick a wallpaper-setter first (see step 1–3 below).
+`install.sh` handles dependencies (`resvg`, Swift toolchain), builds the binary, and drops the systemd units in place. `gh-wallpaper init` is the interactive setup — it asks for your username + theme, auto-detects your canvas via `swaymsg`/`wlr-randr`/`xrandr`, picks a wallpaper-setter from `$XDG_CURRENT_DESKTOP`, writes the systemd drop-in, enables the timer, and renders once. Re-run `gh-wallpaper init` any time to reconfigure.
 
-After install:
+To also refresh while logged out (overnight desktops):
+
+```sh
+loginctl enable-linger "$USER"
+```
+
+Skip on laptops — default behavior is what you want.
+
+---
+
+## Manual setup (advanced / scripted)
+
+Skip this if you ran `gh-wallpaper init`. This section covers driving systemd by hand for users who can't or don't want to use the interactive flow (CI, sandboxes, full configuration management).
 
 ### 1. Set your GitHub username
 
@@ -50,7 +63,7 @@ Environment=GH_THEME=catppuccin-mocha
 Environment=GH_CANVAS=2560x1440
 ```
 
-`GH_CANVAS` matters — `install.sh` doesn't auto-detect your display. Find your resolution with `xrandr` (X11) or `swaymsg -t get_outputs` (sway/Hyprland) or your DE's display settings.
+Find your resolution with `xrandr` (X11) or `swaymsg -t get_outputs` (sway/Hyprland) or your DE's display settings.
 
 ### 2. Pick the wallpaper-setter for your desktop
 
@@ -96,13 +109,11 @@ systemctl --user start gh-wallpaper.service       # render once now
 journalctl --user-unit=gh-wallpaper.service -n 50 # check for errors
 ```
 
-To also refresh while logged out (overnight desktops):
+For non-interactive scripts that want to skip the systemctl steps (write the drop-in only):
 
 ```sh
-loginctl enable-linger "$USER"
+gh-wallpaper init --no-enable < answers.txt
 ```
-
-Skip on laptops — default behavior is what you want.
 
 ---
 

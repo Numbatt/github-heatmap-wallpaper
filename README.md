@@ -23,7 +23,7 @@ brew tap Numbatt/tap
 brew install gh-wallpaper
 ```
 
-### From source
+### From source (macOS)
 
 If you'd rather build locally (e.g. you don't use Homebrew):
 
@@ -35,16 +35,6 @@ cd github-heatmap-wallpaper
 
 `install.sh` checks for the Swift toolchain and `resvg`, builds the release binary, and copies it into your Homebrew prefix (or `/usr/local/bin`).
 
-### On Linux
-
-```sh
-git clone https://github.com/Numbatt/github-heatmap-wallpaper
-cd github-heatmap-wallpaper
-./contrib/linux/install.sh
-```
-
-See the [Linux (beta) section](#linux-beta) below for the post-install steps (set username, pick wallpaper-setter, enable timer).
-
 Then run the wizard:
 
 ```sh
@@ -52,6 +42,17 @@ gh-wallpaper
 ```
 
 It'll ask for your GitHub username, theme, and which displays to use; preview the result; set the wallpaper; and register a background daemon. From that point on, your wallpaper updates itself.
+
+### On Linux
+
+```sh
+git clone https://github.com/Numbatt/github-heatmap-wallpaper
+cd github-heatmap-wallpaper
+./contrib/linux/install.sh
+gh-wallpaper init       # interactive: username, theme, canvas, wallpaper-setter
+```
+
+`init` writes the systemd drop-in for you, enables the hourly timer, and renders once. Re-run it any time to reconfigure. See the [Linux (beta) section](#linux-beta) below for what's supported and the manual setup path if you'd rather drive systemd directly.
 
 ---
 

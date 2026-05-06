@@ -8,7 +8,7 @@
 
 set -euo pipefail
 
-IMAGE="${1:-${HOME}/.cache/gh-wallpaper/heatmap.png}"
+IMAGE="${1:-${HOME}/.cache/gh-wallpaper/wallpaper.png}"
 URI="file://${IMAGE}"
 
 gsettings set org.gnome.desktop.background picture-uri "${URI}"

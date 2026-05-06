@@ -33,7 +33,7 @@ TSV
 USER=""
 THEME="github-dark"
 CANVAS="2560x1440"
-OUTPUT="${XDG_CACHE_HOME:-${HOME}/.cache}/gh-wallpaper/heatmap.png"
+OUTPUT="${XDG_CACHE_HOME:-${HOME}/.cache}/gh-wallpaper/wallpaper.png"
 SVG_ONLY=0
 
 # --- helpers --------------------------------------------------------------
@@ -52,7 +52,7 @@ Required:
 Options:
   --theme ID          theme id (default: github-dark)
   --canvas WxH        canvas size in pixels (default: 2560x1440)
-  --output PATH       output PNG path (default: \$XDG_CACHE_HOME/gh-wallpaper/heatmap.png)
+  --output PATH       output PNG path (default: \$XDG_CACHE_HOME/gh-wallpaper/wallpaper.png)
   --svg-only          print SVG to stdout, skip rasterization
   --themes            list available themes and exit
   --version           print version and exit

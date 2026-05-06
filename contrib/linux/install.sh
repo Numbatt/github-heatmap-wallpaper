@@ -144,34 +144,21 @@ install_units() {
 }
 install_units
 
-# 6. Next steps (don't auto-enable — user has to set GH_USER first)
+# 6. Next step — point the user at the interactive setup.
 cat <<EOF
 
 ────────────────────────────────────────────────────
-Installed. Three more steps before the wallpaper updates:
+Installed. Finish setup with:
 
-1. Set your GitHub username:
-     systemctl --user edit gh-wallpaper.service
-   In the editor, add (substituting your username):
-     [Service]
-     Environment=GH_USER=your-github-username
+  gh-wallpaper init
 
-2. Pick a wallpaper-setter for your desktop and add it as ExecStartPost:
-     # GNOME / Cinnamon / MATE
-     ExecStartPost=%h/.local/bin/set-wallpaper-gnome.sh
-     # KDE Plasma
-     ExecStartPost=%h/.local/bin/set-wallpaper-kde.sh
-     # XFCE
-     ExecStartPost=%h/.local/bin/set-wallpaper-xfce.sh
-     # sway / Hyprland — see contrib/linux/README.md (different pattern)
+It walks you through username / theme / canvas, picks a wallpaper-setter
+based on your desktop, writes the systemd drop-in for you, and renders
+once so you see it work.
 
-3. Enable the timer + render once now:
-     systemctl --user enable --now gh-wallpaper.timer
-     systemctl --user start gh-wallpaper.service
-     journalctl --user-unit=gh-wallpaper.service -n 50
+Prefer to drive systemd by hand? See the "Manual setup" section in:
+  ${REPO_URL}/blob/main/contrib/linux/README.md
 
 If anything misbehaves, run \`gh-wallpaper diagnose\` and paste the output
 into a bug report at: ${REPO_URL}/issues/new?template=linux-bug.md
-
-Docs: ${REPO_URL}/blob/main/contrib/linux/README.md
 EOF

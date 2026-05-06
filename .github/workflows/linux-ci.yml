@@ -64,3 +64,24 @@ jobs:
           # the byte 0x89 followed by ASCII "PNG".
           head -c 4 /tmp/smoke.png | grep -q "PNG"
           echo "✓ smoke render OK ($(stat -c '%s' /tmp/smoke.png) bytes)"
+
+      - name: Smoke `init` (drop-in writer)
+        # Pipe answers into the interactive `init` flow. `--no-enable` keeps
+        # us out of systemctl/journalctl, which would fail in the container
+        # (no user bus). Asserts the drop-in lands on disk with the right
+        # values — catches regressions in argument parsing, prompt flow, or
+        # the systemd path math without needing a real Linux desktop.
+        # Inputs (one per line): username, theme (1=github-dark),
+        # canvas, setter (4=feh).
+        env:
+          XDG_CURRENT_DESKTOP: "i3"   # makes setter #4 (feh) the auto-detected default
+        run: |
+          printf 'octocat\n1\n1920x1080\n4\n' \
+            | .build/release/gh-wallpaper init --no-enable
+          DROPIN="$HOME/.config/systemd/user/gh-wallpaper.service.d/override.conf"
+          test -f "$DROPIN"
+          grep -q '^Environment=GH_USER=octocat$'         "$DROPIN"
+          grep -q '^Environment=GH_THEME=github-dark$'    "$DROPIN"
+          grep -q '^Environment=GH_CANVAS=1920x1080$'     "$DROPIN"
+          grep -q 'set-wallpaper-feh.sh'                  "$DROPIN"
+          echo "✓ init wrote drop-in correctly"

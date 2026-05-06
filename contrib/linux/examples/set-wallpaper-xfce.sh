@@ -9,7 +9,7 @@
 
 set -euo pipefail
 
-IMAGE="${1:-${HOME}/.cache/gh-wallpaper/heatmap.png}"
+IMAGE="${1:-${HOME}/.cache/gh-wallpaper/wallpaper.png}"
 
 xfconf-query -c xfce4-desktop -l \
     | grep -E '/backdrop/screen[0-9]+/monitor[^/]+/workspace[0-9]+/last-image$' \

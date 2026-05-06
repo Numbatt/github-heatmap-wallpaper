@@ -7,7 +7,7 @@
 
 set -euo pipefail
 
-IMAGE="${1:-${HOME}/.cache/gh-wallpaper/heatmap.png}"
+IMAGE="${1:-${HOME}/.cache/gh-wallpaper/wallpaper.png}"
 
 # qdbus6 on Plasma 6, qdbus on Plasma 5.
 QDBUS="${QDBUS:-qdbus6}"

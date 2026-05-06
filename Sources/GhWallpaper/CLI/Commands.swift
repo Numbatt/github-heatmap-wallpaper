@@ -34,12 +34,18 @@ public enum Commands {
         case "start":                    return runStart()
         case "displays":                 return runDisplays()
         case "uninstall":                return runUninstall()
+        case "init":
+            FileHandle.standardError.write(Data(
+                "`init` is Linux-only. On macOS, run `gh-wallpaper` (no args) for the interactive wizard.\n".utf8
+            ))
+            return 1
         #else
         case "--daemon", "daemon", "refresh", "pause", "start", "displays", "uninstall":
             FileHandle.standardError.write(Data(
                 "`\(first)` is macOS-only. On Linux, control the systemd unit directly:\n  systemctl --user enable --now gh-wallpaper.timer\n  systemctl --user start gh-wallpaper.service\nSee contrib/linux/README.md.\n".utf8
             ))
             return 1
+        case "init":                     return await runLinuxInit(args: Array(args.dropFirst()))
         #endif
         default:
             // Convenience: `gh-wallpaper <username>` runs a one-shot render
@@ -694,6 +700,9 @@ public enum Commands {
         print("displays: \(DisplayEnumerator.all().count)")
         #else
         print("systemd unit: \(FileManager.default.fileExists(atPath: Paths.systemdUnitPath.path) ? Paths.systemdUnitPath.path : "(not installed)")")
+        let dropIn = Paths.systemdUnitPath.deletingLastPathComponent()
+            .appendingPathComponent("\(Paths.systemdUnitName).d/override.conf")
+        print("drop-in:      \(FileManager.default.fileExists(atPath: dropIn.path) ? dropIn.path : "(none — run `gh-wallpaper init`)")")
         print("(see journalctl --user-unit=gh-wallpaper.service for runtime logs)")
         #endif
         print("log: \(Paths.logFile.path)")
@@ -701,6 +710,34 @@ public enum Commands {
     }
 
     #if !os(macOS)
+    /// `gh-wallpaper init` — Linux-only setup. See `LinuxInit.swift`.
+    /// Recognized flags: `--no-enable` (skip systemctl, just write the drop-in).
+    private static func runLinuxInit(args: [String]) async -> Int32 {
+        var noEnable = false
+        for arg in args {
+            switch arg {
+            case "--no-enable": noEnable = true
+            case "-h", "--help":
+                print("""
+                gh-wallpaper init — interactive Linux setup.
+
+                Walks through username / theme / canvas / wallpaper-setter,
+                writes a systemd drop-in (~/.config/systemd/user/gh-wallpaper.service.d/override.conf),
+                enables the timer, and renders once.
+
+                Options:
+                  --no-enable    Write the drop-in but don't run `systemctl enable/start`.
+                                 Use in containers, sandboxes, or when scripting.
+                """)
+                return 0
+            default:
+                FileHandle.standardError.write(Data("unknown flag: \(arg)\n".utf8))
+                return 2
+            }
+        }
+        return await LinuxInit().run(options: .init(noEnable: noEnable))
+    }
+
     /// Best-effort reader for `/etc/os-release` fields. Returns nil if the
     /// file or key isn't present. Strips surrounding quotes from the value.
     private static func readOSReleaseField(_ key: String) -> String? {
@@ -860,6 +897,8 @@ public enum Commands {
         gh-wallpaper — GitHub contribution heatmap as your desktop wallpaper (Linux beta)
 
         Usage:
+          gh-wallpaper init                     Interactive setup: write systemd drop-in,
+                                                pick wallpaper-setter, enable timer, render once
           gh-wallpaper render --user X --canvas WxH --output PATH
                                                 Render PNG to PATH at the given canvas size
                                                 (e.g. --canvas 2560x1440 --output ~/.cache/gh-wallpaper/wallpaper.png)
