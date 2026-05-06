@@ -21,7 +21,7 @@ set -euo pipefail
 LOCAL_BIN="${HOME}/.local/bin"
 SYSTEMD_USER_DIR="${HOME}/.config/systemd/user"
 REPO_URL="https://github.com/Numbatt/github-heatmap-wallpaper"
-RESVG_VERSION="0.43.0"
+RESVG_VERSION="0.47.0"
 
 die()   { printf '\033[31merror:\033[0m %s\n' "$*" >&2; exit 1; }
 info()  { printf '\033[34m→\033[0m %s\n' "$*"; }
@@ -92,8 +92,8 @@ install_resvg() {
     tmp=$(mktemp -d)
     trap 'rm -rf "$tmp"' EXIT
     curl -fsSL -o "$tmp/resvg.tar.gz" \
-        "https://github.com/RazrFalcon/resvg/releases/download/v${RESVG_VERSION}/resvg-x86_64-unknown-linux-gnu.tar.gz"
-    tar -xzf "$tmp/resvg.tar.gz" -C "$tmp" resvg
+        "https://github.com/RazrFalcon/resvg/releases/download/v${RESVG_VERSION}/resvg-linux-x86_64.tar.gz"
+    tar -xzf "$tmp/resvg.tar.gz" -C "$tmp"
     install -Dm755 "$tmp/resvg" "${LOCAL_BIN}/resvg"
     done_ "installed resvg ${RESVG_VERSION} to ${LOCAL_BIN}/resvg"
 }

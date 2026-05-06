@@ -27,10 +27,10 @@ jobs:
           apt-get install -y --no-install-recommends curl ca-certificates
           # resvg isn't in apt's default repos on jammy; grab the prebuilt
           # release binary. Pin the version so CI is deterministic.
-          RESVG_VERSION="0.43.0"
+          RESVG_VERSION="0.47.0"
           curl -fsSL -o /tmp/resvg.tar.gz \
-            "https://github.com/RazrFalcon/resvg/releases/download/v${RESVG_VERSION}/resvg-x86_64-unknown-linux-gnu.tar.gz"
-          tar -xzf /tmp/resvg.tar.gz -C /usr/local/bin/ resvg
+            "https://github.com/RazrFalcon/resvg/releases/download/v${RESVG_VERSION}/resvg-linux-x86_64.tar.gz"
+          tar -xzf /tmp/resvg.tar.gz -C /usr/local/bin/
           chmod +x /usr/local/bin/resvg
           resvg --version
 
