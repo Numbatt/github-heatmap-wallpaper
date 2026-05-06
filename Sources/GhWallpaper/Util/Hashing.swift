@@ -1,3 +1,4 @@
+#if canImport(CryptoKit)
 import CryptoKit
 import Foundation
 
@@ -78,3 +79,4 @@ public func renderHash(
     let digest = hasher.finalize()
     return digest.map { String(format: "%02x", $0) }.joined()
 }
+#endif
