@@ -61,5 +61,8 @@ jobs:
           .build/release/gh-wallpaper diagnose
           .build/release/gh-wallpaper render --user octocat --canvas 1920x1080 --output /tmp/smoke.png
           test -s /tmp/smoke.png
-          file /tmp/smoke.png | grep -q "PNG image"
+          # Verify PNG magic bytes without depending on `file`, which isn't
+          # installed in the minimal swift container. PNG header starts with
+          # the byte 0x89 followed by ASCII "PNG".
+          head -c 4 /tmp/smoke.png | grep -q "PNG"
           echo "✓ smoke render OK ($(stat -c '%s' /tmp/smoke.png) bytes)"
