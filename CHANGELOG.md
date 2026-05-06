@@ -2,7 +2,7 @@
 
 All notable changes to `gh-wallpaper` are recorded here. The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project follows semver.
 
-## [Unreleased]
+## [0.2.1] — 2026-05-06
 
 ### Added
 - **Linux support (beta).** The Swift library now compiles on Linux. `gh-wallpaper render --user X --canvas WxH --output PATH` produces the same PNG (heatmap + DESIGN BUILD SHIP headline) as the macOS app, with all 11 themes and custom JSON themes available. A new `contrib/linux/install.sh` handles dependencies (resvg, Swift toolchain), builds from source, and drops the systemd user units. Existing per-DE wallpaper-setter shims (GNOME / KDE / XFCE / sway / Hyprland / X11+feh) carry over unchanged. The macOS-only daemon, visual editor, and multi-display rendering are out of scope for the Linux beta — Linux runs as a render-only binary driven by the systemd timer.

@@ -1,22 +1,15 @@
 class GhWallpaper < Formula
   desc "GitHub contribution heatmap as your macOS desktop wallpaper"
   homepage "https://github.com/Numbatt/github-heatmap-wallpaper"
-  url "https://github.com/Numbatt/github-heatmap-wallpaper/archive/refs/tags/v0.2.0.tar.gz"
-  version "0.2.0"
-  sha256 "143bbdd5955126f894975458c72518493564c8a56896a76cc96a50c76e1d1dcb"
+  url "https://github.com/Numbatt/github-heatmap-wallpaper/archive/refs/tags/v0.2.1.tar.gz"
+  version "0.2.1"
+  sha256 "0000000000000000000000000000000000000000000000000000000000000000"
   license "MIT"
 
   head "https://github.com/Numbatt/github-heatmap-wallpaper.git", branch: "main"
 
-  bottle do
-    root_url "https://github.com/Numbatt/github-heatmap-wallpaper/releases/download/v0.2.0"
-    sha256 cellar: :any_skip_relocation, arm64_sequoia: "c82d2dc724bf704d6275d3b152c21c3b62358acd0fab065b654106e5e3367183"
-    sha256 cellar: :any_skip_relocation, arm64_sonoma:  "c1a6310495e5021e02ff46aa66d456125af473b48a2cd6488955766ae8921e9c"
-    sha256 cellar: :any_skip_relocation, arm64_tahoe:   "3233f4d22ceed94929f8c1fea5a55ae6d4a3db7fb3212f9965035762a8928187"
-  end
-
   # Bottle block intentionally empty until release tag + bottles are built.
-  # `script/update-bottle-block.sh v0.2.0` will splice in the real values
+  # `script/update-bottle-block.sh v0.2.1` will splice in the real values
   # once CI publishes the Sonoma/Sequoia bottles and the manual Tahoe
   # bottle is uploaded — see docs/RELEASING.md.
 
