@@ -1,13 +1,13 @@
 # Install stats
 
-> *Auto-generated from `docs/install-stats.ndjson`. Last snapshot: **2026-05-06T06:14:09Z**. Do not hand-edit — re-run `script/install-stats.sh` to regenerate.*
+> *Auto-generated from `docs/install-stats.ndjson`. Last snapshot: **2026-05-07T06:20:09Z**. Do not hand-edit — re-run `script/install-stats.sh` to regenerate.*
 
 ## Install signals
 
 | Metric | Value | What it counts |
 |---|---:|---|
-| **Installs of latest release** (`v0.2.1`) | **4** | Bottles pulled for the newest tag. The most honest install number we have. |
-| All-time install events | 45 | Sum of every bottle download across every release. **Inflated by `brew upgrade` churn — not a user count.** |
+| **Installs of latest release** (`v0.2.2`) | **4** | Bottles pulled for the newest tag. The most honest install number we have. |
+| All-time install events | 49 | Sum of every bottle download across every release. **Inflated by `brew upgrade` churn — not a user count.** |
 
 ## What is one "install"?
 
@@ -19,6 +19,7 @@ This is why the headline figure is "installs of the latest release" rather than 
 
 | Tag | Bottle downloads (cumulative, all platforms) |
 |---|---:|
+| `v0.2.2` | 4 |
 | `v0.2.1` | 4 |
 | `v0.2.0` | 5 |
 | `v0.1.3` | 9 |
@@ -39,4 +40,4 @@ Data source is GitHub's own public releases API for *this repo*. Snapshotting th
 
 ## History
 
-Each daily snapshot is one line in [`install-stats.ndjson`](install-stats.ndjson). The file is append-only (deduped by date so re-running the script on the same day overwrites that day's row). Total snapshots so far: **2**.
+Each daily snapshot is one line in [`install-stats.ndjson`](install-stats.ndjson). The file is append-only (deduped by date so re-running the script on the same day overwrites that day's row). Total snapshots so far: **3**.

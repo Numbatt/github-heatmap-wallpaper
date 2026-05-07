@@ -5,7 +5,7 @@ Your GitHub contribution heatmap as your desktop wallpaper. Built for macOS; Lin
 ![Wallpaper preview](image.png)
 
 <!-- install-stats:start -->
-**Installs of latest release (v0.2.1):** 4 · [full stats & methodology](docs/INSTALL_STATS.md)
+**Installs of latest release (v0.2.2):** 4 · [full stats & methodology](docs/INSTALL_STATS.md)
 <!-- install-stats:end -->
 
 ---
