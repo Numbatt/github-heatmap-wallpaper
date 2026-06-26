@@ -179,7 +179,7 @@ public actor Daemon {
             failureTracker.recordFailure()
             return
         }
-        let theme = userConfig.resolvedTheme()
+        let (theme, effectiveHeadline) = resolveRotation(userConfig: userConfig)
 
         // 1. Enumerate connected displays, then filter by `displays` mode.
         let allDisplays = DisplayEnumerator.all()
@@ -201,13 +201,14 @@ public actor Daemon {
         }
         logger.debug("fetched \(calendar.days.count) days, contentHash=\(calendar.contentHash)")
 
-        // 3. Hash check (combines content + theme + per-display geometry +
+        // 3. Hash check (combines content + theme + headline + per-display geometry +
         //    system appearance). If nothing changed since last successful run,
         //    we skip render + set entirely.
         let appearance = Self.systemAppearance()
         let hash = combinedRenderHash(
             calendar: calendar,
             theme: theme,
+            headline: effectiveHeadline,
             displays: displays,
             systemAppearance: appearance
         )
@@ -241,7 +242,7 @@ public actor Daemon {
         let stamp = String(Int(Date().timeIntervalSince1970 * 1000))
         for display in displays {
             let canvas = SVGBuilder.Canvas(widthPx: display.widthPx, heightPx: display.heightPx)
-            let svg = svgBuilder.build(calendar: calendar, theme: theme, canvas: canvas)
+            let svg = svgBuilder.build(calendar: calendar, theme: theme, canvas: canvas, headline: effectiveHeadline)
             let livePNG = outputDir.appendingPathComponent("wallpaper-\(display.uuid)-\(stamp).png")
             let tempPNG = outputDir.appendingPathComponent("wallpaper-\(display.uuid)-\(stamp).new.png")
 
@@ -326,6 +327,7 @@ public actor Daemon {
     private func combinedRenderHash(
         calendar: ContributionCalendar,
         theme: Theme,
+        headline: HeadlineOptions,
         displays: [DisplayInfo],
         systemAppearance: String
     ) -> String {
@@ -333,6 +335,9 @@ public actor Daemon {
         hasher.combine(calendar.contentHash)
         hasher.combine(theme.id)
         hasher.combine(systemAppearance)
+        hasher.combine(headline.resolvedText)
+        hasher.combine(headline.fontString)
+        hasher.combine(headline.resolvedSizeScale.bitPattern)
         // Sort by UUID for stable hashing regardless of NSScreen ordering.
         for d in displays.sorted(by: { $0.uuid < $1.uuid }) {
             hasher.combine(d.uuid)
@@ -340,6 +345,79 @@ public actor Daemon {
             hasher.combine(d.heightPx)
         }
         return String(hasher.finalize(), radix: 16)
+    }
+
+    // MARK: - Rotation helpers
+
+    /// Resolves the effective theme and headline options for this refresh tick.
+    /// If daily rotation is configured, picks from the pool at the first tick
+    /// of each calendar day and holds the pick stable until midnight.
+    private func resolveRotation(userConfig: UserConfig) -> (theme: Theme, headline: HeadlineOptions) {
+        let today = currentDateString()
+        var rotState = RotationStateStore.read()
+        var dirty = false
+
+        // Theme rotation
+        let resolvedTheme: Theme
+        let rotConfig = userConfig.rotationConfig
+        if rotConfig.themeMode == .daily {
+            if rotState.lastThemePickDate != today {
+                let pool = resolvedThemePool(config: rotConfig)
+                rotState.pickedThemeID = pool.randomElement()?.id
+                rotState.lastThemePickDate = today
+                dirty = true
+            }
+            resolvedTheme = rotState.pickedThemeID.flatMap { Themes.byId($0) } ?? userConfig.resolvedTheme()
+        } else {
+            resolvedTheme = userConfig.resolvedTheme()
+        }
+
+        // Headline rotation
+        var resolvedHeadline = userConfig.resolvedHeadlineOptions()
+        if rotConfig.headlineMode == .daily, !rotConfig.headlinePool.isEmpty {
+            if rotState.lastHeadlinePickDate != today {
+                rotState.pickedHeadlineText = rotConfig.headlinePool.randomElement()
+                rotState.lastHeadlinePickDate = today
+                dirty = true
+            }
+            if let text = rotState.pickedHeadlineText {
+                resolvedHeadline.text = text
+            }
+        }
+
+        if dirty { try? RotationStateStore.write(rotState) }
+        return (resolvedTheme, resolvedHeadline)
+    }
+
+    /// Returns the theme pool for rotation. Filters out `"auto"` (rotation picks
+    /// must be stable for the day, not appearance-reactive). Falls back to all
+    /// built-ins when the configured pool is empty or resolves to nothing.
+    private func resolvedThemePool(config: RotationConfig) -> [Theme] {
+        if config.themePool.isEmpty {
+            return Themes.builtins
+        }
+        let result = config.themePool.compactMap { id -> Theme? in
+            guard id != "auto" else { return nil }
+            guard let t = Themes.byId(id) else {
+                logger.warn("rotation pool: unknown theme id '\(id)', skipping")
+                return nil
+            }
+            return t
+        }
+        if result.isEmpty {
+            logger.warn("rotation pool is empty after filtering; using all built-ins")
+            return Themes.builtins
+        }
+        return result
+    }
+
+    /// Returns today's date as "yyyy-MM-dd" in the user's local time zone.
+    private func currentDateString() -> String {
+        let fmt = DateFormatter()
+        fmt.locale = Locale(identifier: "en_US_POSIX")
+        fmt.dateFormat = "yyyy-MM-dd"
+        fmt.timeZone = TimeZone.current
+        return fmt.string(from: Date())
     }
 
     private func fetchWithBackoff(username: String) async throws -> ContributionCalendar {

@@ -16,7 +16,8 @@ public struct SVGBuilder: Sendable {
     public func build(
         calendar: ContributionCalendar,
         theme: Theme,
-        canvas: Canvas
+        canvas: Canvas,
+        headline: HeadlineOptions = .default
     ) -> String {
         let w = Double(canvas.widthPx)
         let h = Double(canvas.heightPx)
@@ -34,7 +35,7 @@ public struct SVGBuilder: Sendable {
         //   - title baseline at h × 0.30
         //   - heatmap top at h × 0.55
         //   - balanced top/bottom margins
-        let targetHeadlineHeight = min(0.12 * min(w, h), 600)
+        let targetHeadlineHeight = min(0.12 * headline.resolvedSizeScale * min(w, h), 600)
         let maxHeadlineWidth = w * 0.73
         let heatmapWidth = w * 0.75
         let heatmapCenterX = w / 2
@@ -87,36 +88,47 @@ public struct SVGBuilder: Sendable {
             }
         }
 
-        // Headline. Pass the bottom-anchor target — Headline.swift will lay out
-        // from a top, so we provide topGuess and let it overflow upward only
-        // if the actual height ends up smaller (it won't shift visually since
-        // we're using the bottom anchor for positioning the heatmap).
-        let headlineText = "DESIGN  BUILD  SHIP"
-        var actualHeadlineHeight: Double = targetHeadlineHeight
-        // Re-anchor: position headline so its rendered bottom ≈ headlineBottom.
-        // We do a two-pass: first pass computes actualHeight; second pass renders
-        // with the correct top so the bottom edge lines up.
-        var throwaway = 0.0
-        _ = renderHeadline(
-            text: headlineText,
-            color: theme.headlineColor,
-            centerX: heatmapCenterX,
-            topY: headlineTopGuess,
-            targetHeight: targetHeadlineHeight,
-            maxWidth: maxHeadlineWidth,
-            actualHeight: &throwaway
-        )
-        actualHeadlineHeight = throwaway
-        let headlineTop = headlineBottom - actualHeadlineHeight
-        svg += renderHeadline(
-            text: headlineText,
-            color: theme.headlineColor,
-            centerX: heatmapCenterX,
-            topY: headlineTop,
-            targetHeight: targetHeadlineHeight,
-            maxWidth: maxHeadlineWidth,
-            actualHeight: &actualHeadlineHeight
-        )
+        // Headline. Bottom anchor at h × 0.40 regardless of rendering mode.
+        let headlineText = headline.resolvedText
+        switch headline.resolvedFont {
+        case .pixelGlyphs:
+            // Two-pass pixel-glyph path: first pass measures actualHeight so we can
+            // anchor the bottom edge precisely; second pass emits the SVG rects.
+            var throwaway = 0.0
+            _ = renderHeadline(
+                text: headlineText,
+                color: theme.headlineColor,
+                centerX: heatmapCenterX,
+                topY: headlineTopGuess,
+                targetHeight: targetHeadlineHeight,
+                maxWidth: maxHeadlineWidth,
+                actualHeight: &throwaway
+            )
+            let headlineTop = headlineBottom - throwaway
+            var unused = 0.0
+            svg += renderHeadline(
+                text: headlineText,
+                color: theme.headlineColor,
+                centerX: heatmapCenterX,
+                topY: headlineTop,
+                targetHeight: targetHeadlineHeight,
+                maxWidth: maxHeadlineWidth,
+                actualHeight: &unused
+            )
+
+        case .system(let family):
+            // Single-pass SVG <text> path. resvg resolves font-family via fontdb.
+            // No text-metrics callback from resvg, so we use headlineBottom directly
+            // as the alphabetic baseline — close enough for all-caps display text.
+            svg += renderSystemFontHeadline(
+                text: headlineText,
+                fontFamily: family,
+                fontSize: targetHeadlineHeight,
+                color: theme.headlineColor,
+                centerX: heatmapCenterX,
+                baselineY: headlineBottom
+            )
+        }
 
         // Heatmap cells.
         let radius = layout.cells.first.map { $0.width * 0.25 } ?? 0
@@ -131,6 +143,27 @@ public struct SVGBuilder: Sendable {
 
         svg += "</svg>\n"
         return svg
+    }
+
+    private func renderSystemFontHeadline(
+        text: String,
+        fontFamily: String,
+        fontSize: Double,
+        color: String,
+        centerX: Double,
+        baselineY: Double
+    ) -> String {
+        let escapedFamily = escapeXMLAttribute(fontFamily)
+        let escapedText = escapeXMLAttribute(text)
+        return "  <text"
+            + " x=\"\(round3(centerX))\""
+            + " y=\"\(round3(baselineY))\""
+            + " font-family=\"\(escapedFamily)\""
+            + " font-size=\"\(round3(fontSize))\""
+            + " fill=\"\(color)\""
+            + " text-anchor=\"middle\""
+            + " dominant-baseline=\"alphabetic\""
+            + ">\(escapedText)</text>\n"
     }
 
     private func round3(_ v: Double) -> String {

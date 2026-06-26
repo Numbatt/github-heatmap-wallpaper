@@ -45,7 +45,7 @@ public enum ThemeEditor {
         let view = ThemeEditorView(model: model)
 
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 1100, height: 960),
+            contentRect: NSRect(x: 0, y: 0, width: 1100, height: 1060),
             styleMask: [.titled, .closable, .resizable],
             backing: .buffered,
             defer: false
@@ -139,6 +139,14 @@ final class ThemeEditorModel: ObservableObject {
     @Published var sourceImagePath: String?
     @Published var dimAlpha: Double
 
+    // Headline display options (global config, not per-theme).
+    /// Empty string = use the default "DESIGN  BUILD  SHIP".
+    @Published var headlineText: String
+    @Published var headlineUseSystemFont: Bool
+    @Published var headlineFontFamily: String
+    @Published var headlineSizeScale: Double
+    @Published var recentFontFamilies: [String]
+
     @Published var previewImage: NSImage?
     @Published var statusMessage: String = ""
     @Published var isSaving = false
@@ -173,6 +181,20 @@ final class ThemeEditorModel: ObservableObject {
         }
         self.dimAlpha = seed.backgroundDimAlpha ?? 0.4
 
+        // Headline options: load from current config so the editor reflects reality.
+        let savedOpts = (try? ConfigStore.read())?.resolvedHeadlineOptions() ?? .default
+        self.headlineText = savedOpts.text ?? ""
+        switch savedOpts.resolvedFont {
+        case .pixelGlyphs:
+            self.headlineUseSystemFont = false
+            self.headlineFontFamily = "SF Mono"
+        case .system(let family):
+            self.headlineUseSystemFont = true
+            self.headlineFontFamily = family
+        }
+        self.headlineSizeScale = savedOpts.resolvedSizeScale
+        self.recentFontFamilies = []
+
         self.renderer = try? PreviewRenderer()
 
         // Subscribe to *input fields only*. Subscribing to `objectWillChange`
@@ -189,6 +211,10 @@ final class ThemeEditorModel: ObservableObject {
             $ramp.dropFirst().map { _ in () }.eraseToAnyPublisher(),
             $sourceImagePath.dropFirst().map { _ in () }.eraseToAnyPublisher(),
             $dimAlpha.dropFirst().map { _ in () }.eraseToAnyPublisher(),
+            $headlineText.dropFirst().map { _ in () }.eraseToAnyPublisher(),
+            $headlineUseSystemFont.dropFirst().map { _ in () }.eraseToAnyPublisher(),
+            $headlineFontFamily.dropFirst().map { _ in () }.eraseToAnyPublisher(),
+            $headlineSizeScale.dropFirst().map { _ in () }.eraseToAnyPublisher(),
         ])
         inputChanged
             .debounce(for: .milliseconds(150), scheduler: DispatchQueue.main)
@@ -203,11 +229,12 @@ final class ThemeEditorModel: ObservableObject {
         }
         renderTask?.cancel()
         let theme = currentTheme(forPreview: true)
+        let headlineOpts = currentHeadlineOptions()
         renderTask = Task { @MainActor in
             do {
                 // resvg subprocess + PNG-bytes read off-main (Data is Sendable).
                 let pngData = try await Task.detached(priority: .userInitiated) {
-                    try renderer.renderPNGData(theme: theme)
+                    try renderer.renderPNGData(theme: theme, headline: headlineOpts)
                 }.value
                 if Task.isCancelled { return }
                 // NSImage decode happens on main so SwiftUI's Image(nsImage:)
@@ -224,6 +251,20 @@ final class ThemeEditorModel: ObservableObject {
                 self.statusMessage = "preview failed: \(error)"
             }
         }
+    }
+
+    /// Builds the current `HeadlineOptions` from the model's display fields.
+    func currentHeadlineOptions() -> HeadlineOptions {
+        let text: String? = headlineText.isEmpty ? nil : headlineText
+        let font: HeadlineFont
+        if headlineUseSystemFont {
+            let family = headlineFontFamily.trimmingCharacters(in: .whitespaces)
+            font = .system(family: family.isEmpty ? "SF Mono" : family)
+        } else {
+            font = .pixelGlyphs
+        }
+        let scale: Double? = headlineSizeScale == 1.0 ? nil : headlineSizeScale
+        return HeadlineOptions(text: text, font: font, sizeScale: scale)
     }
 
     /// True when the current theme name is a non-empty, non-builtin id.
@@ -368,6 +409,16 @@ final class ThemeEditorModel: ObservableObject {
             }
             let themeForDisk = currentTheme(forPreview: false)
             let writtenURL = try CustomThemes.shared.save(themeForDisk)
+
+            // Persist headline options to config.toml (silently skips if no config yet).
+            let headlineOpts = currentHeadlineOptions()
+            if var savedConfig = try? ConfigStore.read() {
+                savedConfig.headlineText = headlineOpts.text
+                savedConfig.headlineFont = headlineOpts.font
+                savedConfig.headlineSizeScale = headlineOpts.sizeScale
+                try? ConfigStore.write(savedConfig)
+            }
+
             isSaving = false
 
             // Explicit confirmation modal so the user gets unambiguous
@@ -449,11 +500,17 @@ struct ThemeEditorView: View {
         VStack(spacing: 16) {
             preview
             Divider()
-            controls
+            ScrollView {
+                VStack(spacing: 0) {
+                    controls
+                    Divider().padding(.vertical, 12)
+                    headlineSection
+                }
+            }
             footer
         }
         .padding(20)
-        .frame(minWidth: 1000, minHeight: 880)
+        .frame(minWidth: 1000, minHeight: 920)
         .onAppear { model.regeneratePreview() }
     }
 
@@ -510,6 +567,82 @@ struct ThemeEditorView: View {
                     .foregroundStyle(model.sourceImagePath == nil ? .secondary : .primary)
                 Spacer()
             }
+        }
+    }
+
+    private var headlineSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Headline")
+                .font(.headline)
+                .padding(.bottom, 2)
+
+            // Text
+            HStack {
+                Text("Text").frame(width: 110, alignment: .leading)
+                TextField("DESIGN  BUILD  SHIP", text: $model.headlineText)
+                    .textFieldStyle(.roundedBorder)
+                Spacer()
+            }
+
+            // Font style toggle
+            HStack {
+                Text("Font style").frame(width: 110, alignment: .leading)
+                Picker("", selection: $model.headlineUseSystemFont) {
+                    Text("Pixel glyphs").tag(false)
+                    Text("System font").tag(true)
+                }
+                .pickerStyle(.radioGroup)
+                .horizontalRadioGroupLayout()
+                Spacer()
+            }
+
+            // System font controls (only when system font selected)
+            if model.headlineUseSystemFont {
+                HStack(alignment: .top) {
+                    Text("Family").frame(width: 110, alignment: .leading)
+                    VStack(alignment: .leading, spacing: 6) {
+                        FontFamilyPickerButton(
+                            family: $model.headlineFontFamily,
+                            recentFamilies: $model.recentFontFamilies
+                        )
+                        // Inline sample: SwiftUI renders this instantly (no resvg).
+                        Text(model.headlineText.isEmpty ? "DESIGN  BUILD  SHIP" : model.headlineText)
+                            .font(.custom(
+                                model.headlineFontFamily.isEmpty ? "SF Mono" : model.headlineFontFamily,
+                                size: 20
+                            ))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.top, 2)
+                    }
+                    Spacer()
+                }
+                .onChange(of: model.headlineUseSystemFont) { _, isSystem in
+                    if isSystem && model.headlineFontFamily.isEmpty {
+                        model.headlineFontFamily = "SF Mono"
+                    }
+                }
+            }
+
+            // Size scale
+            HStack {
+                Text("Size").frame(width: 110, alignment: .leading)
+                Slider(value: $model.headlineSizeScale, in: 0.5...2.0, step: 0.05)
+                    .frame(maxWidth: 200)
+                Text(String(format: "%.0f%%", model.headlineSizeScale * 100))
+                    .font(.system(.caption, design: .monospaced))
+                    .frame(width: 44, alignment: .trailing)
+                Stepper("", value: $model.headlineSizeScale, in: 0.5...2.0, step: 0.05)
+                    .labelsHidden()
+                Spacer()
+            }
+
+            Text("Headline settings apply globally (all themes + wallpaper rotations).")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .padding(.top, 2)
         }
     }
 
@@ -571,6 +704,104 @@ struct ThemeEditorView: View {
         }
     }
 }
+
+// MARK: - Font family picker
+
+private struct FontFamilyPickerButton: View {
+    @Binding var family: String
+    @Binding var recentFamilies: [String]
+    @State private var showPopover = false
+
+    var body: some View {
+        Button { showPopover.toggle() } label: {
+            HStack(spacing: 6) {
+                Text(family.isEmpty ? "Select font…" : family)
+                    .font(family.isEmpty ? .body : .custom(family, size: 14))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                Spacer()
+                Image(systemName: "chevron.down")
+                    .imageScale(.small)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(minWidth: 200, maxWidth: 280)
+        }
+        .buttonStyle(.bordered)
+        .popover(isPresented: $showPopover, arrowEdge: .bottom) {
+            FontFamilyPopoverContent(
+                selectedFamily: $family,
+                recentFamilies: $recentFamilies,
+                isPresented: $showPopover
+            )
+        }
+    }
+}
+
+private struct FontFamilyPopoverContent: View {
+    @Binding var selectedFamily: String
+    @Binding var recentFamilies: [String]
+    @Binding var isPresented: Bool
+    @State private var searchText = ""
+    @FocusState private var searchFocused: Bool
+
+    private let allFamilies: [String] = NSFontManager.shared.availableFontFamilies.sorted()
+
+    private var filteredFamilies: [String] {
+        guard !searchText.isEmpty else { return allFamilies }
+        return allFamilies.filter { $0.localizedCaseInsensitiveContains(searchText) }
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 6) {
+                Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                TextField("Search fonts…", text: $searchText)
+                    .textFieldStyle(.plain)
+                    .focused($searchFocused)
+            }
+            .padding(10)
+
+            Divider()
+
+            List {
+                if searchText.isEmpty, !recentFamilies.isEmpty {
+                    Section("Recently used") {
+                        ForEach(recentFamilies, id: \.self) { f in fontRow(f) }
+                    }
+                    Section("All fonts") {
+                        ForEach(filteredFamilies, id: \.self) { f in fontRow(f) }
+                    }
+                } else {
+                    ForEach(filteredFamilies, id: \.self) { f in fontRow(f) }
+                }
+            }
+            .listStyle(.inset)
+        }
+        .frame(width: 300, height: 400)
+        .onAppear { searchFocused = true }
+    }
+
+    @ViewBuilder
+    private func fontRow(_ f: String) -> some View {
+        HStack {
+            Text(f).font(.custom(f, size: 14)).lineLimit(1)
+            Spacer()
+            if f == selectedFamily {
+                Image(systemName: "checkmark").foregroundStyle(Color.accentColor)
+            }
+        }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            selectedFamily = f
+            recentFamilies.removeAll { $0 == f }
+            recentFamilies.insert(f, at: 0)
+            if recentFamilies.count > 5 { recentFamilies = Array(recentFamilies.prefix(5)) }
+            isPresented = false
+        }
+    }
+}
+
+// MARK: - Color rows
 
 private struct ColorRow<Trailing: View>: View {
     let label: String

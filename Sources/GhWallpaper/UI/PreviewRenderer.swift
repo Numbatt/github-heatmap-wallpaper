@@ -22,8 +22,8 @@ public struct PreviewRenderer {
         self.calendar = calendar ?? Self.syntheticCalendar()
     }
 
-    public func render(theme: Theme, canvas: SVGBuilder.Canvas = PreviewRenderer.defaultCanvas) throws -> NSImage {
-        let data = try renderPNGData(theme: theme, canvas: canvas)
+    public func render(theme: Theme, canvas: SVGBuilder.Canvas = PreviewRenderer.defaultCanvas, headline: HeadlineOptions = .default) throws -> NSImage {
+        let data = try renderPNGData(theme: theme, canvas: canvas, headline: headline)
         guard let image = Self.imageFromPNG(data: data) else {
             throw RasterizerError.ioError("could not decode preview PNG")
         }
@@ -34,8 +34,8 @@ public struct PreviewRenderer {
     /// Returns the raw PNG `Data`. Doesn't touch any AppKit types, so
     /// callers can run this from `Task.detached` without crossing the
     /// main-actor boundary with non-Sendable AppKit objects.
-    public func renderPNGData(theme: Theme, canvas: SVGBuilder.Canvas = PreviewRenderer.defaultCanvas) throws -> Data {
-        let svg = builder.build(calendar: calendar, theme: theme, canvas: canvas)
+    public func renderPNGData(theme: Theme, canvas: SVGBuilder.Canvas = PreviewRenderer.defaultCanvas, headline: HeadlineOptions = .default) throws -> Data {
+        let svg = builder.build(calendar: calendar, theme: theme, canvas: canvas, headline: headline)
         let pngURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("gh-wallpaper-preview-\(UUID().uuidString).png")
         try rasterizer.rasterize(

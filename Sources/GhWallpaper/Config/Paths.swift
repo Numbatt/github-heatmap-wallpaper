@@ -76,6 +76,10 @@ public enum Paths {
         stateDir.appendingPathComponent("state.json")
     }
 
+    public static var rotationStateFile: URL {
+        stateDir.appendingPathComponent("rotation-state.json")
+    }
+
     /// Directory where users drop custom theme JSON files.
     /// Each `*.json` file under this dir is loaded at startup, decoded
     /// into a `Theme`, and made available alongside the built-ins.

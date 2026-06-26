@@ -24,6 +24,7 @@ public enum Commands {
         switch first {
         case "--help", "-h", "help":     return printHelp()
         case "render":                   return await runRender(args: Array(args.dropFirst()))
+        case "rotate":                   return await runRotate(args: Array(args.dropFirst()))
         case "theme":                    return await runTheme(args: Array(args.dropFirst()))
         case "themes":                   return await runThemes(args: Array(args.dropFirst()))
         case "diagnose":                 return runDiagnose()
@@ -133,13 +134,19 @@ public enum Commands {
         var themeID: String? = nil
         var canvasArg: String? = nil
         var outputArg: String? = nil
+        var headlineTextArg: String? = nil
+        var headlineFontArg: String? = nil
+        var headlineSizeArg: String? = nil
         var i = 0
         while i < args.count {
             switch args[i] {
-            case "--user":   username   = args[safe: i + 1]; i += 2
-            case "--theme":  themeID    = args[safe: i + 1]; i += 2
-            case "--canvas": canvasArg  = args[safe: i + 1]; i += 2
-            case "--output": outputArg  = args[safe: i + 1]; i += 2
+            case "--user":           username       = args[safe: i + 1]; i += 2
+            case "--theme":          themeID        = args[safe: i + 1]; i += 2
+            case "--canvas":         canvasArg      = args[safe: i + 1]; i += 2
+            case "--output":         outputArg      = args[safe: i + 1]; i += 2
+            case "--headline-text":  headlineTextArg = args[safe: i + 1]; i += 2
+            case "--headline-font":  headlineFontArg = args[safe: i + 1]; i += 2
+            case "--headline-size":  headlineSizeArg = args[safe: i + 1]; i += 2
             default: i += 1
             }
         }
@@ -165,17 +172,40 @@ public enum Commands {
             theme = config?.resolvedTheme() ?? Themes.githubDark
         }
 
+        // Build headline options: start from config, apply any per-render overrides.
+        var headline = config?.resolvedHeadlineOptions() ?? .default
+        if let t = headlineTextArg { headline.text = t.isEmpty ? nil : t }
+        if let f = headlineFontArg {
+            if let parsed = HeadlineFont.parse(f) {
+                headline.font = parsed
+            } else {
+                FileHandle.standardError.write(Data(
+                    "invalid --headline-font: \(f) (use 'pixel-glyphs' or 'system:<family>')\n".utf8
+                ))
+                return 1
+            }
+        }
+        if let s = headlineSizeArg {
+            guard let d = Double(s), d > 0 else {
+                FileHandle.standardError.write(Data(
+                    "invalid --headline-size: \(s) (expected a positive number, e.g. 1.2)\n".utf8
+                ))
+                return 1
+            }
+            headline.sizeScale = d
+        }
+
         // Explicit-canvas path: works on both platforms. `--canvas WxH
         // --output PATH` skips display enumeration and writes one PNG.
         if canvasArg != nil || outputArg != nil {
             return await renderToCanvas(
-                username: user, theme: theme,
+                username: user, theme: theme, headline: headline,
                 canvasArg: canvasArg, outputArg: outputArg
             )
         }
 
         #if os(macOS)
-        return await renderOneShot(username: user, theme: theme, setWallpaper: false)
+        return await renderOneShot(username: user, theme: theme, setWallpaper: false, headline: headline)
         #else
         FileHandle.standardError.write(Data(
             "on Linux, pass --canvas WxH --output PATH (auto-detection lands in a follow-up release).\nExample: gh-wallpaper render --user \(user) --canvas 2560x1440 --output ~/.cache/gh-wallpaper/wallpaper.png\n".utf8
@@ -191,6 +221,7 @@ public enum Commands {
     private static func renderToCanvas(
         username: String,
         theme: Theme,
+        headline: HeadlineOptions = .default,
         canvasArg: String?,
         outputArg: String?
     ) async -> Int32 {
@@ -223,7 +254,7 @@ public enum Commands {
             let rasterizer = try Rasterizer()
             let builder = SVGBuilder()
             let canvas = SVGBuilder.Canvas(widthPx: width, heightPx: height)
-            let svg = builder.build(calendar: calendar, theme: theme, canvas: canvas)
+            let svg = builder.build(calendar: calendar, theme: theme, canvas: canvas, headline: headline)
 
             let outURL = URL(fileURLWithPath: outputPath)
             // Ensure parent directory exists; users may pass a path under a
@@ -267,10 +298,155 @@ public enum Commands {
             username: config.username,
             theme: config.resolvedTheme(),
             displaysMode: config.displays,
-            setWallpaper: true
+            setWallpaper: true,
+            headline: config.resolvedHeadlineOptions()
         )
     }
     #endif
+
+    // MARK: - Rotate
+
+    private static func runRotate(args: [String]) async -> Int32 {
+        guard let verb = args.first else { return printRotateStatus() }
+        let rest = Array(args.dropFirst())
+        switch verb {
+        case "theme":    return await runRotateTheme(args: rest)
+        case "headline": return await runRotateHeadline(args: rest)
+        default:
+            FileHandle.standardError.write(Data(
+                "unknown rotate verb: \(verb)\nusage: gh-wallpaper rotate [theme|headline] [daily|off] [...]\n".utf8
+            ))
+            return 1
+        }
+    }
+
+    private static func printRotateStatus() -> Int32 {
+        guard let config = try? ConfigStore.read() else {
+            FileHandle.standardError.write(Data("no config; run `gh-wallpaper` to set up\n".utf8))
+            return 1
+        }
+        let rot = config.rotationConfig
+        let state = RotationStateStore.read()
+
+        print("Theme rotation: \(rot.themeMode.rawValue)")
+        if !rot.themePool.isEmpty {
+            print("  pool: \(rot.themePool.joined(separator: ", "))")
+        } else if rot.themeMode == .daily {
+            print("  pool: (all built-in themes)")
+        }
+        if let picked = state.pickedThemeID, let date = state.lastThemePickDate {
+            print("  today's pick (\(date)): \(picked)")
+        }
+
+        print("Headline rotation: \(rot.headlineMode.rawValue)")
+        if !rot.headlinePool.isEmpty {
+            print("  pool: \(rot.headlinePool.map { "'\($0)'" }.joined(separator: ", "))")
+        }
+        if let picked = state.pickedHeadlineText, let date = state.lastHeadlinePickDate {
+            print("  today's pick (\(date)): \(picked)")
+        }
+        return 0
+    }
+
+    private static func runRotateTheme(args: [String]) async -> Int32 {
+        guard let mode = args.first else {
+            FileHandle.standardError.write(Data(
+                "usage: gh-wallpaper rotate theme [daily|off] [<id1> <id2> ...]\n".utf8
+            ))
+            return 1
+        }
+        switch mode {
+        case "off":
+            return await updateRotation { config in
+                config.rotationConfig.themeMode = .off
+            }
+        case "daily":
+            let pool = Array(args.dropFirst())
+            var validPool: [String] = []
+            for id in pool {
+                if id == "auto" {
+                    print("note: 'auto' is excluded from rotation pools (picks must be stable for the day)")
+                } else if Themes.byId(id) == nil {
+                    FileHandle.standardError.write(Data("warning: unknown theme id '\(id)'; skipping\n".utf8))
+                } else {
+                    validPool.append(id)
+                }
+            }
+            if !pool.isEmpty && validPool.isEmpty {
+                FileHandle.standardError.write(Data("error: no valid themes in pool after filtering\n".utf8))
+                return 1
+            }
+            return await updateRotation { config in
+                config.rotationConfig.themeMode = .daily
+                config.rotationConfig.themePool = validPool
+            }
+        default:
+            FileHandle.standardError.write(Data(
+                "unknown mode: \(mode) (expected 'daily' or 'off')\n".utf8
+            ))
+            return 1
+        }
+    }
+
+    private static func runRotateHeadline(args: [String]) async -> Int32 {
+        guard let mode = args.first else {
+            FileHandle.standardError.write(Data(
+                "usage: gh-wallpaper rotate headline [daily|off] [<text1> <text2> ...]\n".utf8
+            ))
+            return 1
+        }
+        switch mode {
+        case "off":
+            return await updateRotation { config in
+                config.rotationConfig.headlineMode = .off
+            }
+        case "daily":
+            let pool = Array(args.dropFirst())
+            if pool.isEmpty {
+                FileHandle.standardError.write(Data(
+                    "daily headline rotation requires at least one text entry\nusage: gh-wallpaper rotate headline daily \"TEXT 1\" \"TEXT 2\" ...\n".utf8
+                ))
+                return 1
+            }
+            for text in pool where text.contains("|") {
+                FileHandle.standardError.write(Data(
+                    "headline pool entries cannot contain '|' (it's used as delimiter in config)\n".utf8
+                ))
+                return 1
+            }
+            return await updateRotation { config in
+                config.rotationConfig.headlineMode = .daily
+                config.rotationConfig.headlinePool = pool
+            }
+        default:
+            FileHandle.standardError.write(Data(
+                "unknown mode: \(mode) (expected 'daily' or 'off')\n".utf8
+            ))
+            return 1
+        }
+    }
+
+    private static func updateRotation(_ mutate: (inout UserConfig) -> Void) async -> Int32 {
+        guard var config = try? ConfigStore.read() else {
+            FileHandle.standardError.write(Data("no config; run `gh-wallpaper` to set up\n".utf8))
+            return 1
+        }
+        mutate(&config)
+        do {
+            try ConfigStore.write(config)
+            RotationStateStore.clear()  // force re-pick on next tick with new pool
+            #if os(macOS)
+            print("→ rotation updated; refreshing wallpaper…")
+            return await runRefreshOnce(config: config)
+            #else
+            print("→ rotation updated. The systemd timer will pick it up on next firing.")
+            return 0
+            #endif
+        } catch {
+            FileHandle.standardError.write(Data("could not save config: \(error)\n".utf8))
+            return 1
+        }
+    }
 
     private static let builtinThemeIDs: Set<String> = Set(Themes.builtins.map(\.id) + ["auto"])
 
@@ -789,7 +965,8 @@ public enum Commands {
         username: String,
         theme: Theme,
         displaysMode: UserConfig.DisplayMode = .all,
-        setWallpaper: Bool
+        setWallpaper: Bool,
+        headline: HeadlineOptions = .default
     ) async -> Int32 {
         do {
             let displays = displaysMode.filter(DisplayEnumerator.all())
@@ -808,7 +985,7 @@ public enum Commands {
             let builder = SVGBuilder()
             for display in displays {
                 let canvas = SVGBuilder.Canvas(widthPx: display.widthPx, heightPx: display.heightPx)
-                let svg = builder.build(calendar: calendar, theme: theme, canvas: canvas)
+                let svg = builder.build(calendar: calendar, theme: theme, canvas: canvas, headline: headline)
 
                 // Write to a uniquely-suffixed path so macOS treats every render
                 // as a new image. Without this, NSWorkspace.setDesktopImageURL
@@ -869,7 +1046,17 @@ public enum Commands {
                               [--theme T]
                               [--canvas WxH]   Override display detection
                               [--output PATH]  Write PNG to this path
+                              [--headline-text "TEXT"]  Override headline for this render
+                              [--headline-font "system:SF Mono"|"pixel-glyphs"]
+                              [--headline-size 1.2]     Override size scale (1.0 = default)
           gh-wallpaper refresh                 Force an immediate refresh + set wallpaper
+          gh-wallpaper rotate theme daily [<id1> <id2> ...]
+                                               Enable daily random theme rotation
+          gh-wallpaper rotate theme off        Disable theme rotation
+          gh-wallpaper rotate headline daily "TEXT 1" "TEXT 2" ...
+                                               Enable daily random headline rotation
+          gh-wallpaper rotate headline off     Disable headline rotation
+          gh-wallpaper rotate                  Show current rotation config + today's picks
           gh-wallpaper theme <id>              Apply a theme (built-in or custom).
           gh-wallpaper theme <id> --edit       Open the editor seeded from <id>.
                                                Built-ins fork on save (must rename);

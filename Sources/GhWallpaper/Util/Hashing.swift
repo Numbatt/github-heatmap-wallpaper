@@ -16,7 +16,8 @@ public func renderHash(
     calendar: ContributionCalendar,
     theme: Theme,
     canvas: SVGBuilder.Canvas,
-    systemAppearance: String
+    systemAppearance: String,
+    headline: HeadlineOptions = .default
 ) -> String {
     var hasher = SHA256()
 
@@ -75,6 +76,14 @@ public func renderHash(
     // for non-auto themes since it's a stable input.
     hasher.update(data: Data("\nappearance:".utf8))
     hasher.update(data: Data(systemAppearance.utf8))
+
+    // Headline options — text, font, and size all affect the rendered output.
+    hasher.update(data: Data("\nheadline:".utf8))
+    hasher.update(data: Data(headline.resolvedText.utf8))
+    hasher.update(data: Data("|".utf8))
+    hasher.update(data: Data(headline.fontString.utf8))
+    hasher.update(data: Data("|".utf8))
+    hasher.update(data: Data(String(headline.resolvedSizeScale).utf8))
 
     let digest = hasher.finalize()
     return digest.map { String(format: "%02x", $0) }.joined()
