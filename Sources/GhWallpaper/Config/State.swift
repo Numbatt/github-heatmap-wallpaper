@@ -9,18 +9,37 @@ public struct DaemonState: Codable {
     public var consecutiveFailures: Int
     public var lastError: String?
 
+    /// The version string of the binary the last time the daemon ran.
+    /// Used to detect first-run after an upgrade and show "what's new".
+    public var lastSeenVersion: String?
+    /// When the daemon last hit the GitHub releases API to check for updates.
+    public var lastUpdateCheckAt: Date?
+    /// The latest version returned by the update check, if newer than CurrentVersion.
+    public var latestAvailableVersion: String?
+    /// The latest version we already sent a macOS notification for, so we
+    /// don't re-notify on every tick.
+    public var lastUpdateNotifiedVersion: String?
+
     public init(
         lastRefreshAt: Date? = nil,
         lastRenderHash: String? = nil,
         lastDataHash: String? = nil,
         consecutiveFailures: Int = 0,
-        lastError: String? = nil
+        lastError: String? = nil,
+        lastSeenVersion: String? = nil,
+        lastUpdateCheckAt: Date? = nil,
+        latestAvailableVersion: String? = nil,
+        lastUpdateNotifiedVersion: String? = nil
     ) {
         self.lastRefreshAt = lastRefreshAt
         self.lastRenderHash = lastRenderHash
         self.lastDataHash = lastDataHash
         self.consecutiveFailures = consecutiveFailures
         self.lastError = lastError
+        self.lastSeenVersion = lastSeenVersion
+        self.lastUpdateCheckAt = lastUpdateCheckAt
+        self.latestAvailableVersion = latestAvailableVersion
+        self.lastUpdateNotifiedVersion = lastUpdateNotifiedVersion
     }
 }
 

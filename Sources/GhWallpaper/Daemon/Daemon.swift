@@ -85,6 +85,16 @@ public actor Daemon {
             "power=\(timer.isOnAC ? "AC" : "battery") network=\(timer.isReachable ? "up" : "down")"
         )
 
+        // Detect first run after an upgrade and log what changed.
+        var startupState = StateStore.read()
+        if let notes = whatsNew(since: startupState.lastSeenVersion) {
+            logger.info("updated to v\(CurrentVersion) — what's new:\n\(notes)")
+        }
+        if startupState.lastSeenVersion != CurrentVersion {
+            startupState.lastSeenVersion = CurrentVersion
+            try? StateStore.write(startupState)
+        }
+
         // Synthetic login event triggers an immediate refresh.
         observers.post(.login)
 
@@ -298,6 +308,61 @@ public actor Daemon {
         failureTracker.recordSuccess()
         let geom = displays.map { "\($0.widthPx)x\($0.heightPx)" }.joined(separator: ",")
         logger.info("refresh complete (hash=\(hash.prefix(12))… displays=\(displays.count) [\(geom)])")
+
+        maybeCheckForUpdate()
+    }
+
+    /// Fires a background update check at most once per 24 hours.
+    /// Non-blocking: spawns a detached Task so the refresh loop is never stalled.
+    private func maybeCheckForUpdate() {
+        let state = StateStore.read()
+        let now = Date()
+        if let last = state.lastUpdateCheckAt, now.timeIntervalSince(last) < 86_400 { return }
+
+        let log = logger
+        Task.detached {
+            guard let url = URL(string: "https://api.github.com/repos/Numbatt/github-heatmap-wallpaper/releases/latest") else { return }
+            var req = URLRequest(url: url)
+            req.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+            req.setValue(Scraper.userAgent, forHTTPHeaderField: "User-Agent")
+            req.timeoutInterval = 10
+
+            do {
+                let (data, response) = try await URLSession.shared.data(for: req)
+                guard let http = response as? HTTPURLResponse, http.statusCode == 200 else { return }
+                guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                      let tagName = json["tag_name"] as? String else { return }
+                let latest = tagName.hasPrefix("v") ? String(tagName.dropFirst()) : tagName
+
+                var updated = StateStore.read()
+                updated.lastUpdateCheckAt = now
+                if isNewerVersion(latest, than: CurrentVersion) {
+                    updated.latestAvailableVersion = latest
+                    // Notify once per available version so we don't re-fire every day.
+                    if updated.lastUpdateNotifiedVersion != latest {
+                        updated.lastUpdateNotifiedVersion = latest
+                        try? StateStore.write(updated)
+                        log.info("update available: v\(latest)")
+                        UNUserNotificationsNotifier().notify(
+                            title: "gh-wallpaper v\(latest) available",
+                            body: "Run `brew upgrade Numbatt/tap/gh-wallpaper` to update."
+                        )
+                    } else {
+                        try? StateStore.write(updated)
+                    }
+                } else {
+                    updated.latestAvailableVersion = nil
+                    try? StateStore.write(updated)
+                }
+            } catch {
+                // Network failures during update check are silent — not worth
+                // surfacing to the user since the main refresh handles that.
+                log.debug("update check failed: \(error)")
+                var updated = StateStore.read()
+                updated.lastUpdateCheckAt = now
+                try? StateStore.write(updated)
+            }
+        }
     }
 
     /// Deletes `wallpaper-<UUID>-*.png` for each display except the file with

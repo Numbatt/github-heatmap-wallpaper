@@ -23,6 +23,7 @@ public enum Commands {
         }
         switch first {
         case "--help", "-h", "help":     return printHelp()
+        case "--version", "-V", "version": return runVersion()
         case "render":                   return await runRender(args: Array(args.dropFirst()))
         case "rotate":                   return await runRotate(args: Array(args.dropFirst()))
         case "theme":                    return await runTheme(args: Array(args.dropFirst()))
@@ -867,6 +868,20 @@ public enum Commands {
     }
     #endif
 
+    private static func runVersion() -> Int32 {
+        print("gh-wallpaper v\(CurrentVersion)")
+        let state = StateStore.read()
+        if let latest = state.latestAvailableVersion, isNewerVersion(latest, than: CurrentVersion) {
+            print("update available: v\(latest) — run `brew upgrade Numbatt/tap/gh-wallpaper`")
+        }
+        // whatsNew(since: nil) always returns the changelog for CurrentVersion.
+        if let notes = whatsNew(since: nil) {
+            print("\nWhat's new in v\(CurrentVersion):")
+            print(notes)
+        }
+        return 0
+    }
+
     private static func runDiagnose() -> Int32 {
         let config = try? ConfigStore.read()
         let state = StateStore.read()
@@ -880,6 +895,12 @@ public enum Commands {
 
         print("gh-wallpaper diagnose")
         print("─────────────────────")
+        print("version: v\(CurrentVersion)")
+        if let latest = state.latestAvailableVersion, isNewerVersion(latest, than: CurrentVersion) {
+            print("update:  v\(latest) available — run `brew upgrade Numbatt/tap/gh-wallpaper`")
+        } else if state.lastUpdateCheckAt != nil {
+            print("update:  up to date")
+        }
         #if os(macOS)
         print("platform: macOS")
         #else
@@ -1084,6 +1105,7 @@ public enum Commands {
 
         Usage:
           gh-wallpaper                         Run setup wizard (or re-run to reconfigure)
+          gh-wallpaper version                 Show current version and what's new
           gh-wallpaper edit                    Open the visual theme editor for your current theme
           gh-wallpaper <theme>                 Switch theme — shorthand for `theme <id>`
                                                dark · light · dracula · midnight · nord · paper
