@@ -10,8 +10,9 @@ class GhWallpaper < Formula
 
   bottle do
     root_url "https://github.com/Numbatt/github-heatmap-wallpaper/releases/download/v0.2.3"
-    # Bottles built by CI after the tag is pushed.
-    # Run `script/update-bottle-block.sh v0.2.3` once CI finishes.
+    sha256 cellar: :any_skip_relocation, arm64_sequoia: "5512c0e7e8c8f1a83989ec8ab01b12a82bbcc24ff4052716208c3680379c3e85"
+    sha256 cellar: :any_skip_relocation, arm64_sonoma:  "a971520ab595f656dc35e2c654573d220da6b701be995d5e3d6f82589654a254"
+    sha256 cellar: :any_skip_relocation, arm64_tahoe:   "27004943d9394aef3bf54751b1860e24fd14f763c7e043aa050dc5dda351136c"
   end
 
   # No `depends_on xcode` — Homebrew enforces it as full Xcode.app, which
