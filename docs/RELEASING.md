@@ -2,6 +2,8 @@
 
 How to cut a new version, build bottles, update both formula copies, and verify a clean install. Follow this top-to-bottom and a release takes ~15 minutes of wall time (~5 of which is CI; the rest is local).
 
+> **Before anything else:** update `Sources/GhWallpaper/Util/Version.swift` — bump `CurrentVersion` and add a `changelog` entry for the new version. This is what powers `gh-wallpaper version`, the upgrade notification, and the "what's new" daemon log. Skipping it means users see no release notes and the update checker won't fire correctly.
+
 > **`/ship` is not enough.** `/ship` handles the git side of pushing code (commit, push, PR). It does **not** tag a release, build bottles, or update the Homebrew tap. For a real Homebrew release you need this runbook.
 
 > **Linux is not part of the release pipeline.** The bottles + tap dance is macOS-only. Linux users `git clone` the repo at the latest tag and run `contrib/linux/install.sh` — they don't pull from Homebrew. So a release is "macOS bottle ships, Linux git tag exists for users who want to pin." Tagging a version is enough; no extra Linux step.
@@ -14,9 +16,10 @@ How to cut a new version, build bottles, update both formula copies, and verify 
 
 VERSION=0.1.2                                            # whatever you're shipping
 
-# 1. Bump formula version + url. SHA stays placeholder; we'll fix it after the tag exists.
-$EDITOR Formula/gh-wallpaper.rb     # change `version` and `url` to the new version
-git add Formula/gh-wallpaper.rb
+# 1. Bump version in code + formula. SHA stays placeholder; we'll fix it after the tag exists.
+$EDITOR Sources/GhWallpaper/Util/Version.swift   # update CurrentVersion + add changelog entry
+$EDITOR Formula/gh-wallpaper.rb                  # change `version` and `url` to the new version
+git add Sources/GhWallpaper/Util/Version.swift Formula/gh-wallpaper.rb
 git commit -m "release: v$VERSION"
 git push origin main
 
