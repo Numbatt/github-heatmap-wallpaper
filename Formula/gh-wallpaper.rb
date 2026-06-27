@@ -1,24 +1,18 @@
 class GhWallpaper < Formula
   desc "GitHub contribution heatmap as your macOS desktop wallpaper"
   homepage "https://github.com/Numbatt/github-heatmap-wallpaper"
-  url "https://github.com/Numbatt/github-heatmap-wallpaper/archive/refs/tags/v0.2.2.tar.gz"
-  version "0.2.2"
-  sha256 "cefbed5d14109f93a08a8b5ce9ca146c6d971e638ce00de8d579c5077f2da846"
+  url "https://github.com/Numbatt/github-heatmap-wallpaper/archive/refs/tags/v0.2.3.tar.gz"
+  version "0.2.3"
+  sha256 "0000000000000000000000000000000000000000000000000000000000000000"
   license "MIT"
 
   head "https://github.com/Numbatt/github-heatmap-wallpaper.git", branch: "main"
 
   bottle do
-    root_url "https://github.com/Numbatt/github-heatmap-wallpaper/releases/download/v0.2.2"
-    sha256 cellar: :any_skip_relocation, arm64_sequoia: "417acb1ac0e71c779e249747794074958f4727c0b73b69f5178c3eb9f9f10dee"
-    sha256 cellar: :any_skip_relocation, arm64_sonoma:  "b588a6d8eb7b6d60c4ed6a01c6308be684bcf336e968bb83afed9a1e73937c82"
-    sha256 cellar: :any_skip_relocation, arm64_tahoe:   "ae5ff316041626a46f4ec547c94f5b2b7df12c3d350d4d75ec594b777b899e5e"
+    root_url "https://github.com/Numbatt/github-heatmap-wallpaper/releases/download/v0.2.3"
+    # Bottles built by CI after the tag is pushed.
+    # Run `script/update-bottle-block.sh v0.2.3` once CI finishes.
   end
-
-  # Bottle block intentionally empty until release tag + bottles are built.
-  # `script/update-bottle-block.sh v0.2.2` will splice in the real values
-  # once CI publishes the Sonoma/Sequoia bottles and the manual Tahoe
-  # bottle is uploaded — see docs/RELEASING.md.
 
   # No `depends_on xcode` — Homebrew enforces it as full Xcode.app, which
   # most macOS users don't have. The Swift toolchain that ships with Apple's

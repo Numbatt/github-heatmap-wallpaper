@@ -4,6 +4,8 @@ Your GitHub contribution heatmap as your desktop wallpaper. Built for macOS; Lin
 
 ![Wallpaper preview](image.png)
 
+If you find this useful, [leave a star](https://github.com/Numbatt/github-heatmap-wallpaper) — it's the only way I know people are getting value from it.
+
 <!-- install-stats:start -->
 **Installs of latest release (v0.2.2):** 7 · [full stats & methodology](docs/INSTALL_STATS.md)
 <!-- install-stats:end -->
@@ -102,19 +104,22 @@ Twelve themes ship plus an `auto` mode that follows your macOS appearance settin
 Switch any time:
 
 ```sh
-gh-wallpaper theme tokyo-night
-gh-wallpaper themes              # list built-in + custom themes
+gh-wallpaper tokyo-night         # shorthand — works for any built-in or custom theme name
+gh-wallpaper theme tokyo-night   # explicit form, same result
+gh-wallpaper theme               # show current theme + list all available
+gh-wallpaper edit                # open the visual editor for your current theme
 ```
 
 The wallpaper re-renders immediately and the new theme persists.
 
 ### Custom themes
 
-The fastest way to make a theme is the visual editor:
+The fastest way to make or tweak a theme is the visual editor:
 
 ```sh
-gh-wallpaper themes new my-theme           # from scratch
-gh-wallpaper theme dracula --edit          # fork an existing theme (built-in or custom)
+gh-wallpaper edit                          # edit your current theme
+gh-wallpaper themes new my-theme           # create from scratch
+gh-wallpaper theme dracula --edit          # fork a built-in (must rename on save)
 gh-wallpaper theme my-theme --edit         # tweak a custom theme you already saved
 ```
 

@@ -64,7 +64,7 @@ public enum Commands {
             // "dark" and "light" are aliases for the hyphen-prefixed github-* themes.
             let themeAliases: [String: String] = ["dark": "github-dark", "light": "github-light"]
             let themeID = themeAliases[first] ?? first
-            if builtinThemeIDs.contains(themeID) {
+            if builtinThemeIDs.contains(themeID) || CustomThemes.shared.find(id: themeID) != nil {
                 return await runTheme(args: [themeID])
             }
             FileHandle.standardError.write(Data(
