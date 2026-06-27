@@ -35,6 +35,13 @@ public enum Commands {
         case "start":                    return runStart()
         case "displays":                 return runDisplays()
         case "uninstall":                return runUninstall()
+        case "edit":
+            // isEditorInvocation routes this to dispatchEditorSync on macOS;
+            // reaching here means a routing bug.
+            FileHandle.standardError.write(Data(
+                "internal error: 'edit' should have been routed to the editor\n".utf8
+            ))
+            return 1
         case "init":
             FileHandle.standardError.write(Data(
                 "`init` is Linux-only. On macOS, run `gh-wallpaper` (no args) for the interactive wizard.\n".utf8
@@ -46,12 +53,24 @@ public enum Commands {
                 "`\(first)` is macOS-only. On Linux, control the systemd unit directly:\n  systemctl --user enable --now gh-wallpaper.timer\n  systemctl --user start gh-wallpaper.service\nSee contrib/linux/README.md.\n".utf8
             ))
             return 1
+        case "edit":
+            FileHandle.standardError.write(Data(
+                "the visual theme editor is macOS-only. To customize a theme on Linux:\n  gh-wallpaper themes export github-dark > my-theme.json\n  # edit my-theme.json (change \"id\", adjust colors)\n  gh-wallpaper themes import < my-theme.json\n  gh-wallpaper theme my-theme\n".utf8
+            ))
+            return 1
         case "init":                     return await runLinuxInit(args: Array(args.dropFirst()))
         #endif
         default:
-            // Convenience: `gh-wallpaper <username>` runs a one-shot render
-            // for that user without touching saved config.
-            return await runRender(args: ["--user", first])
+            // "dark" and "light" are aliases for the hyphen-prefixed github-* themes.
+            let themeAliases: [String: String] = ["dark": "github-dark", "light": "github-light"]
+            let themeID = themeAliases[first] ?? first
+            if builtinThemeIDs.contains(themeID) {
+                return await runTheme(args: [themeID])
+            }
+            FileHandle.standardError.write(Data(
+                "unknown command: \(first)\nRun `gh-wallpaper --help` for usage.\n".utf8
+            ))
+            return 1
         }
     }
 
@@ -75,6 +94,7 @@ public enum Commands {
         guard let first = stripped.first else { return false }
         let rest = stripped.dropFirst()
         switch first {
+        case "edit":   return true
         case "theme":  return rest.contains("--edit")
         case "themes": return rest.first == "new"
         default:       return false
@@ -99,6 +119,8 @@ public enum Commands {
         guard let first = args.first else { return 1 }
         let rest = Array(args.dropFirst())
         switch first {
+        case "edit":
+            return runEditCurrentThemeSync()
         case "theme":
             return runThemeEditSync(args: rest)
         case "themes":
@@ -465,10 +487,7 @@ public enum Commands {
             return 1
         }
         guard let id = themeID else {
-            FileHandle.standardError.write(Data(
-                "usage: gh-wallpaper theme <id> [--edit]  (run `gh-wallpaper themes` to list available themes)\n".utf8
-            ))
-            return 1
+            return runThemeStatus()
         }
 
         // Plain apply.
@@ -503,6 +522,21 @@ public enum Commands {
 
     // MARK: - Sync editor handlers (called from dispatchEditorSync)
     #if os(macOS)
+
+    /// `gh-wallpaper edit` — open the visual editor seeded from the currently
+    /// active theme. "auto" is resolved to the concrete light/dark theme that
+    /// matches the current system appearance. Built-in themes require a rename
+    /// on save (fork); custom themes edit in place.
+    private static func runEditCurrentThemeSync() -> Int32 {
+        let config = try? ConfigStore.read()
+        let themeID = config?.themeID ?? "github-dark"
+        // Themes.byId handles "auto" via autoResolved(), so we always get a
+        // concrete seed regardless of the stored value.
+        let seed = Themes.byId(themeID) ?? Themes.githubDark
+        let resolvedID = seed.id  // e.g. "github-dark" even if themeID was "auto"
+        let isBuiltin = builtinThemeIDs.contains(resolvedID)
+        return runEditorSync(seed: seed, initialName: resolvedID, mustRename: isBuiltin)
+    }
 
     private static func runThemeEditSync(args: [String]) -> Int32 {
         var themeID: String? = nil
@@ -656,6 +690,15 @@ public enum Commands {
             ))
             return 1
         }
+    }
+
+    private static func runThemeStatus() -> Int32 {
+        let config = try? ConfigStore.read()
+        if let current = config?.themeID {
+            print("Current theme: \(current)")
+            print("")
+        }
+        return runThemesList()
     }
 
     private static func runThemesList() -> Int32 {
@@ -1041,15 +1084,29 @@ public enum Commands {
 
         Usage:
           gh-wallpaper                         Run setup wizard (or re-run to reconfigure)
-          gh-wallpaper <username>              One-shot render for the given user
+          gh-wallpaper edit                    Open the visual theme editor for your current theme
+          gh-wallpaper <theme>                 Switch theme — shorthand for `theme <id>`
+                                               dark · light · dracula · midnight · nord · paper
+                                               ocean · blossom · tokyo-night · gruvbox-dark
+                                               catppuccin-frappe · catppuccin-mocha · auto
+          gh-wallpaper theme                   Show current theme + list all available
+          gh-wallpaper theme <id>              Apply a theme (built-in or custom)
+          gh-wallpaper theme <id> --edit       Open the editor seeded from <id>
+                                               Built-ins fork on save (must rename);
+                                               customs edit in place.
+          gh-wallpaper themes                  List built-in + custom themes
+          gh-wallpaper themes new <name>       Create a new custom theme in the editor
+          gh-wallpaper themes delete <name>    Remove a custom theme + its image
+          gh-wallpaper themes export <name>    Print theme JSON to stdout (works for built-ins)
+          gh-wallpaper themes import           Read theme JSON from stdin and save it
+          gh-wallpaper refresh                 Force an immediate refresh + set wallpaper
           gh-wallpaper render [--user X]       Render PNG to disk without setting wallpaper
                               [--theme T]
                               [--canvas WxH]   Override display detection
                               [--output PATH]  Write PNG to this path
-                              [--headline-text "TEXT"]  Override headline for this render
+                              [--headline-text "TEXT"]
                               [--headline-font "system:SF Mono"|"pixel-glyphs"]
-                              [--headline-size 1.2]     Override size scale (1.0 = default)
-          gh-wallpaper refresh                 Force an immediate refresh + set wallpaper
+                              [--headline-size 1.2]
           gh-wallpaper rotate theme daily [<id1> <id2> ...]
                                                Enable daily random theme rotation
           gh-wallpaper rotate theme off        Disable theme rotation
@@ -1057,17 +1114,6 @@ public enum Commands {
                                                Enable daily random headline rotation
           gh-wallpaper rotate headline off     Disable headline rotation
           gh-wallpaper rotate                  Show current rotation config + today's picks
-          gh-wallpaper theme <id>              Apply a theme (built-in or custom).
-          gh-wallpaper theme <id> --edit       Open the editor seeded from <id>.
-                                               Built-ins fork on save (must rename);
-                                               customs edit in place.
-          gh-wallpaper themes                  List built-in + custom themes
-          gh-wallpaper themes new <name>       Create a new custom theme in the editor
-                                               (use the "Apply defaults from…" menu to seed
-                                               from any existing theme)
-          gh-wallpaper themes delete <name>    Remove a custom theme + its image
-          gh-wallpaper themes export <name>    Print theme JSON to stdout (works for built-ins)
-          gh-wallpaper themes import           Read theme JSON from stdin and save it
           gh-wallpaper pause                   Stop the launchd agent
           gh-wallpaper start                   Start the launchd agent
           gh-wallpaper displays                List connected displays

@@ -169,7 +169,9 @@ public struct Wizard {
           • every ~2 min when plugged in, ~5 min on battery
           • on wake, network reconnect, or display change
         log: \(Paths.logFile.path)
-        run `gh-wallpaper --help` for commands.
+
+        tip: run `gh-wallpaper edit` to open the visual theme editor.
+        run `gh-wallpaper --help` for all commands.
         """)
     }
 
