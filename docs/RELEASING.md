@@ -27,6 +27,15 @@ git push origin main
 git tag -a "v$VERSION" -m "v$VERSION"
 git push origin "v$VERSION"
 
+# 2b. Create the GitHub Release *immediately* — the Bottle workflow's upload
+#     step does `gh release upload "$VERSION"`, which 404s ("release not found")
+#     if the release object doesn't exist yet. Pushing a tag does NOT create a
+#     release. Do this right after the tag push (before CI's ~40s build finishes)
+#     or the two build jobs fail at the upload step and you must re-run them.
+gh release create "v$VERSION" --title "v$VERSION" --notes "…user-facing bullets…"
+# If CI already failed on the upload step because the release was missing:
+#   gh run rerun <run-id> --failed      # rebuilds + re-uploads; build itself was fine
+
 # 3. Compute the real sha256 (tarball now exists on github.com).
 SHA=$(curl -sL "https://github.com/Numbatt/github-heatmap-wallpaper/archive/refs/tags/v$VERSION.tar.gz" | shasum -a 256 | awk '{print $1}')
 echo "$SHA"   # 64 hex chars
@@ -81,6 +90,10 @@ GitHub Actions runners cover `arm64_sonoma` (macos-14) and `arm64_sequoia` (maco
 We don't ship Intel bottles. Apple Silicon shipped late 2020; Intel + macOS 14+ is a small, shrinking slice. Intel users still get a working install — just the from-source path (`swift build -c release`, ~30 sec).
 
 ## Things that have bitten us (don't re-bite)
+
+### The GitHub Release must exist before the Bottle workflow uploads
+
+`bottle.yml` triggers on the tag push and, after building, runs `gh release upload "$TAG" …`. Pushing a tag does **not** create a Release object, and the workflow has no create-release step. If the Release doesn't exist, both build jobs succeed at compile/bottle but fail at "Upload bottle to release" with `release not found`. Fix: `gh release create "v$VERSION" …` right after the tag push (TL;DR step 2b). If you forgot and CI already went red, the build artifacts are fine — just create the release, then `gh run rerun <run-id> --failed` to re-upload. (Bit us on v0.2.4.)
 
 ### `--no-rebuild` is required
 
