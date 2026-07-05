@@ -11,7 +11,7 @@ Your GitHub contribution heatmap as your desktop wallpaper. Built for macOS; Lin
 
 ![Wallpaper preview](image.png)
 
-If you find this useful, [leave a star](https://github.com/Numbatt/github-heatmap-wallpaper) — it's the only way I know people are getting value from it.
+If you find this useful, please [leave a star](https://github.com/Numbatt/github-heatmap-wallpaper)! It's the only way I know people are getting value from it.
 
 <!-- install-stats:start -->
 **Installs of latest release (v0.2.3):** 4 · [full stats & methodology](docs/INSTALL_STATS.md)
