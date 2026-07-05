@@ -3,7 +3,7 @@ class GhWallpaper < Formula
   homepage "https://github.com/Numbatt/github-heatmap-wallpaper"
   url "https://github.com/Numbatt/github-heatmap-wallpaper/archive/refs/tags/v0.2.4.tar.gz"
   version "0.2.4"
-  sha256 "0000000000000000000000000000000000000000000000000000000000000000"
+  sha256 "1b200a9f0c066bfccb4eb5d7a8e23ce47b4db0364174788745f0d5c5c505757c"
   license "MIT"
 
   head "https://github.com/Numbatt/github-heatmap-wallpaper.git", branch: "main"
