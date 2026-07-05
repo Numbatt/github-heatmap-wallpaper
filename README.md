@@ -2,6 +2,13 @@
 
 Your GitHub contribution heatmap as your desktop wallpaper. Built for macOS; Linux beta available — same renderer, same headline. Refreshes itself in the background so your desktop always reflects what you've shipped this year.
 
+[![Release](https://img.shields.io/github/v/release/Numbatt/github-heatmap-wallpaper?sort=semver)](https://github.com/Numbatt/github-heatmap-wallpaper/releases)
+[![Build](https://img.shields.io/github/actions/workflow/status/Numbatt/github-heatmap-wallpaper/ci.yml?branch=main&label=build)](https://github.com/Numbatt/github-heatmap-wallpaper/actions/workflows/ci.yml)
+![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux-lightgrey)
+![Swift](https://img.shields.io/badge/Swift-5.7%2B-orange?logo=swift&logoColor=white)
+[![License: MIT](https://img.shields.io/github/license/Numbatt/github-heatmap-wallpaper?color=blue)](LICENSE)
+[![Stars](https://img.shields.io/github/stars/Numbatt/github-heatmap-wallpaper)](https://github.com/Numbatt/github-heatmap-wallpaper/stargazers)
+
 ![Wallpaper preview](image.png)
 
 If you find this useful, [leave a star](https://github.com/Numbatt/github-heatmap-wallpaper) — it's the only way I know people are getting value from it.
@@ -9,6 +16,29 @@ If you find this useful, [leave a star](https://github.com/Numbatt/github-heatma
 <!-- install-stats:start -->
 **Installs of latest release (v0.2.3):** 4 · [full stats & methodology](docs/INSTALL_STATS.md)
 <!-- install-stats:end -->
+
+---
+
+## Features
+
+- 🎨 **12 built-in themes** plus an `auto` mode that follows macOS Light/Dark — or design your own in a **native visual editor** (`gh-wallpaper my-theme`).
+- 🖼️ **Custom JSON themes & image backgrounds** — drop any photo behind your heatmap with a tunable dim overlay.
+- 🔄 **Self-updating** — a background daemon re-renders on wake, network-up, display change, and login, with adaptive polling. It only redraws when your contribution data actually changed.
+- 🖥️ **Multi-display & HiDPI aware** on macOS.
+- ✍️ **Custom headline text** and optional **daily theme / headline rotation**.
+- 🔒 **Private by design** — reads only your *public* contribution graph. No PAT, no OAuth, no telemetry.
+- 🍺 **One-line install** via Homebrew (macOS); **Linux beta** via `systemd`.
+
+## Table of Contents
+
+- [Features](#features)
+- [Install](#install)
+- [Themes](#themes) · [Custom themes](#custom-themes) · [Image backgrounds](#image-backgrounds)
+- [How the background daemon works](#how-the-background-daemon-works)
+- [How it gets your contribution data](#how-it-gets-your-contribution-data)
+- [Linux (beta)](#linux-beta)
+- [Requirements](#requirements)
+- [Design notes](#design-notes)
 
 ---
 
@@ -219,9 +249,9 @@ If you want private contributions on the wallpaper, toggle GitHub's "Include pri
 
 ## Linux (beta)
 
-The Swift binary that powers the macOS app now compiles on Linux. You get the **same renderer**, the **DESIGN BUILD SHIP headline included**, and **all 11 built-in themes**. The systemd timer drives the refresh cadence; per-DE shell snippets apply the resulting PNG.
+The Swift binary that powers the macOS app now compiles on Linux. You get the **same renderer**, the **DESIGN BUILD SHIP headline included**, and **all 12 built-in themes**. The systemd timer drives the refresh cadence; per-DE shell snippets apply the resulting PNG.
 
-**What you get:** identical render output to the macOS app (same `SVGBuilder` + `Headline` code path); 11 built-in themes; custom JSON themes + image backgrounds; one-paste install via `install.sh`; per-DE wallpaper-setter shims for GNOME, KDE Plasma 6, XFCE, sway, Hyprland, X11.
+**What you get:** identical render output to the macOS app (same `SVGBuilder` + `Headline` code path); 12 built-in themes; custom JSON themes + image backgrounds; one-paste install via `install.sh`; per-DE wallpaper-setter shims for GNOME, KDE Plasma 6, XFCE, sway, Hyprland, X11.
 
 **Coming later (v2):** long-running event-driven daemon (refresh on wake / network-up / display-change), multi-display rendering, HiDPI auto-detect, visual theme editor. The macOS app has these; the Linux build is starting with the basics and will fill in based on user feedback.
 
