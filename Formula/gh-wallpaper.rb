@@ -9,10 +9,10 @@ class GhWallpaper < Formula
   head "https://github.com/Numbatt/github-heatmap-wallpaper.git", branch: "main"
 
   bottle do
-    root_url "https://github.com/Numbatt/github-heatmap-wallpaper/releases/download/v0.2.3"
-    sha256 cellar: :any_skip_relocation, arm64_sequoia: "5512c0e7e8c8f1a83989ec8ab01b12a82bbcc24ff4052716208c3680379c3e85"
-    sha256 cellar: :any_skip_relocation, arm64_sonoma:  "a971520ab595f656dc35e2c654573d220da6b701be995d5e3d6f82589654a254"
-    sha256 cellar: :any_skip_relocation, arm64_tahoe:   "27004943d9394aef3bf54751b1860e24fd14f763c7e043aa050dc5dda351136c"
+    root_url "https://github.com/Numbatt/github-heatmap-wallpaper/releases/download/v0.2.4"
+    sha256 cellar: :any_skip_relocation, arm64_sequoia: "fef943bd0d1bcda9fa7d7e2e432b04882cfc70af80630fb205960d5dec27d826"
+    sha256 cellar: :any_skip_relocation, arm64_sonoma:  "630d1a34120e7ad511bd11b5561493549b4f2caeb4a05e61a2963b816da1bf79"
+    sha256 cellar: :any_skip_relocation, arm64_tahoe:   "b05d05fbad815e66adbb1b102ed9d453b8d3967117e5dc9413a1ad2fbdaff383"
   end
 
   # No `depends_on xcode` — Homebrew enforces it as full Xcode.app, which
