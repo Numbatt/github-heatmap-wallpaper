@@ -117,13 +117,14 @@ The wallpaper re-renders immediately and the new theme persists.
 The fastest way to make or tweak a theme is the visual editor:
 
 ```sh
+gh-wallpaper my-theme                      # unknown name → offers to create it
+gh-wallpaper my-theme --from dracula       # ...seeded from an existing theme
 gh-wallpaper edit                          # edit your current theme
-gh-wallpaper themes new my-theme           # create from scratch
 gh-wallpaper theme dracula --edit          # fork a built-in (must rename on save)
 gh-wallpaper theme my-theme --edit         # tweak a custom theme you already saved
 ```
 
-A native macOS window opens with system color pickers, an image-background picker, a dim slider, and a live preview. Click **Save & apply '<name>'** to commit and set it as your wallpaper immediately. Forking a built-in (`theme dracula --edit`) requires picking a new name on save — built-ins are immutable.
+Typing a name that isn't a known theme — e.g. `gh-wallpaper my-theme` — asks `Create a custom theme called 'my-theme'?` and opens the editor on yes. A native macOS window opens with system color pickers, an image-background picker, a dim slider, and a live preview. Inside the editor, the **"Apply defaults from…"** menu pastes any existing theme's palette onto your draft, or seed it up front with `--from <base>`. Click **Save & apply '<name>'** to commit and set it as your wallpaper immediately. Forking a built-in (`theme dracula --edit`) requires picking a new name on save — built-ins are immutable.
 
 Other commands:
 

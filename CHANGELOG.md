@@ -2,6 +2,27 @@
 
 All notable changes to `gh-wallpaper` are recorded here. The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project follows semver.
 
+## [0.2.4] — 2026-07-05
+
+### Changed
+- **Creating a theme is now the bare `gh-wallpaper <name>` front door.** Type a name that isn't a known theme — `gh-wallpaper my-theme` — and it asks `Create a custom theme called 'my-theme'? [y/N]`, opening the visual editor on yes. This replaces `gh-wallpaper themes new <name>`, which is removed: on macOS it now prints a one-line redirect to the new syntax; on Linux (no visual editor) it still points at the export/edit/import JSON workflow. Known theme names still apply immediately as before, and `theme <id> --edit` / `edit` are unchanged.
+- Seed a new theme from any existing base directly from the command line: `gh-wallpaper my-theme --from dracula` (also works as `themes new`'s successor). The editor's "Apply defaults from…" menu still works for re-seeding live.
+
+### Added
+- **Typo suggestions.** A bare name that's a near-miss of a real theme (e.g. `darcula`) now surfaces `Did you mean 'dracula'?` before offering to create it, so mistyped applies don't silently become theme-creation prompts.
+- Non-interactive callers (pipes, CI) keep the previous `unknown command` behavior — the create prompt only appears on an interactive terminal, so scripts never hang or get a surprise editor window.
+
+## [0.2.3] — 2026-06-27
+
+### Added
+- **`gh-wallpaper edit`** — opens the visual editor for your active theme with no arguments needed.
+- **`gh-wallpaper <theme-name>` shorthand now works for custom themes too**, not just built-ins.
+- `gh-wallpaper theme` with no arguments prints the current theme plus the full list.
+- `gh-wallpaper dark` / `light` as short aliases for the `github-*` themes.
+
+### Changed
+- Unknown commands now show a clear error instead of silently failing.
+
 ## [0.2.2] — 2026-05-06
 
 ### Added

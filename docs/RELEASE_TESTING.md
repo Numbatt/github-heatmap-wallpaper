@@ -45,8 +45,9 @@ This corresponds to the checklist in `SPEC.md` §17.
       selection (e.g. `paper` or `midnight`). The wallpaper should
       re-render and re-set within seconds — no restart, no re-login.
 - [ ] **4a. Open the visual theme editor and create a custom theme.**
-      Run `gh-wallpaper themes new my-test`. The window opens with
-      seven color pickers and a live preview. Drag a color well —
+      Run `gh-wallpaper my-test` (an unknown name). It prompts
+      `Create a custom theme called 'my-test'? [y/N]` — answer `y`.
+      The window opens with seven color pickers and a live preview. Drag a color well —
       the preview should update within ~250ms. Click "Add image…"
       and pick a PNG/JPEG; preview should show the photo behind
       the heatmap with the dim overlay. Click **Save & apply 'my-test'**.

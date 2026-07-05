@@ -1,11 +1,17 @@
 import Foundation
 
 /// The version string for this binary. Update this on every release.
-public let CurrentVersion = "0.2.3"
+public let CurrentVersion = "0.2.4"
 
 /// Brief "what's new" notes per released version. Shown once on first daemon
 /// tick after an upgrade, and via `gh-wallpaper version`.
 private let changelog: [String: String] = [
+    "0.2.4": """
+        • Create a theme by just typing its name — gh-wallpaper my-theme
+          offers to create it and opens the editor (no more `themes new`)
+        • Seed a new theme from any base with gh-wallpaper my-theme --from dracula
+        • Mistyped a theme name? It now suggests the closest match
+        """,
     "0.2.3": """
         • gh-wallpaper edit — visual editor for your active theme (no args needed)
         • gh-wallpaper <theme-name> shorthand now works for custom themes too

@@ -6,8 +6,9 @@ import GhWallpaper
 // (Sources/GhWallpaper/CLI/Commands.swift).
 //
 // `main` is intentionally synchronous. The editor subcommands
-// (`themes new`, `theme … --edit`) drive `NSApplication.run()` on the
-// main thread; mixing that with `await MainActor.run { … }` from a
+// (`edit`, `theme … --edit`, and the bare `<name>` create front door)
+// drive `NSApplication.run()` on the main thread; mixing that with
+// `await MainActor.run { … }` from a
 // `@main async` Swift Concurrency context starves both `DispatchQueue.main`
 // and MainActor continuations, breaking the live preview and the
 // post-editor wallpaper apply (see `Commands.dispatchEditorSync`).

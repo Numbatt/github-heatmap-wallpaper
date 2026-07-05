@@ -62,12 +62,15 @@ public enum Commands {
         case "init":                     return await runLinuxInit(args: Array(args.dropFirst()))
         #endif
         default:
-            // "dark" and "light" are aliases for the hyphen-prefixed github-* themes.
-            let themeAliases: [String: String] = ["dark": "github-dark", "light": "github-light"]
+            // Bare theme name → apply it. ("dark"/"light" alias the github-* ids.)
             let themeID = themeAliases[first] ?? first
             if builtinThemeIDs.contains(themeID) || CustomThemes.shared.find(id: themeID) != nil {
                 return await runTheme(args: [themeID])
             }
+            // On macOS an unknown single token is intercepted upstream by
+            // `isEditorInvocation` → the "create a theme?" front door, so we
+            // only land here for genuinely malformed input (extra args, flags)
+            // or on Linux, where there's no editor.
             FileHandle.standardError.write(Data(
                 "unknown command: \(first)\nRun `gh-wallpaper --help` for usage.\n".utf8
             ))
@@ -77,15 +80,17 @@ public enum Commands {
 
     // MARK: - Sync editor dispatch
     //
-    // The editor (`themes new`, `theme … --edit`) drives `NSApplication.run()`
-    // on the main thread. Mixing that with `await MainActor.run { … }` from
-    // an async-main Swift Concurrency context starves both `DispatchQueue.main`
-    // and MainActor continuations — preview never renders, post-editor
-    // wallpaper apply never fires. So the entrypoint detects these
-    // invocations up front and runs them on a fully synchronous main thread.
+    // The editor (`edit`, `theme … --edit`, and the bare-name front door)
+    // drives `NSApplication.run()` on the main thread. Mixing that with
+    // `await MainActor.run { … }` from an async-main Swift Concurrency context
+    // starves both `DispatchQueue.main` and MainActor continuations — preview
+    // never renders, post-editor wallpaper apply never fires. So the entrypoint
+    // detects these invocations up front and runs them on a fully synchronous
+    // main thread.
 
-    /// Returns `true` for the two argv shapes that open the SwiftUI editor:
-    /// `themes new …` and `theme <id> --edit`. Verbose flags are tolerated.
+    /// Returns `true` for the argv shapes that open the SwiftUI editor:
+    /// `edit`, `theme <id> --edit`, and the bare `gh-wallpaper <unknown-name>`
+    /// create-a-theme front door. Verbose flags are tolerated.
     /// Always returns false on non-macOS — there is no editor on Linux.
     public static func isEditorInvocation(_ argv: [String]) -> Bool {
         #if !os(macOS)
@@ -97,8 +102,9 @@ public enum Commands {
         switch first {
         case "edit":   return true
         case "theme":  return rest.contains("--edit")
-        case "themes": return rest.first == "new"
-        default:       return false
+        // Bare `gh-wallpaper <unknown-name>` → the create-a-theme front door,
+        // which also opens the editor and so must run on the sync main thread.
+        default:       return bareCreateInvocation(argv) != nil
         }
         #endif
     }
@@ -124,10 +130,13 @@ public enum Commands {
             return runEditCurrentThemeSync()
         case "theme":
             return runThemeEditSync(args: rest)
-        case "themes":
-            // isEditorInvocation already gated this on rest.first == "new".
-            return runThemesNewSync(args: Array(rest.dropFirst()))
         default:
+            // The bare `gh-wallpaper <unknown-name>` front door. `first` is the
+            // theme name (isEditorInvocation only routes us here when
+            // bareCreateInvocation matched), and `rest` is any `--from <base>`.
+            if let create = bareCreateInvocation(argv) {
+                return runBareCreateSync(name: create.name, from: create.from)
+            }
             return 1
         }
         #endif
@@ -473,6 +482,51 @@ public enum Commands {
 
     private static let builtinThemeIDs: Set<String> = Set(Themes.builtins.map(\.id) + ["auto"])
 
+    /// Short aliases users can type in place of the hyphen-prefixed ids.
+    private static let themeAliases: [String: String] = ["dark": "github-dark", "light": "github-light"]
+
+    /// Every reserved first-token that names a subcommand (not a theme).
+    /// Used to tell an unknown *theme name* apart from a mistyped command so
+    /// the bare `gh-wallpaper <name>` front door only offers theme creation.
+    private static let commandKeywords: Set<String> = [
+        "--help", "-h", "help", "--version", "-V", "version",
+        "render", "rotate", "theme", "themes", "diagnose",
+        "--daemon", "daemon", "refresh", "pause", "start",
+        "displays", "uninstall", "edit", "init",
+    ]
+
+    /// Classifies `gh-wallpaper <name> [--from <base>]` where `<name>` is
+    /// neither a known subcommand nor a known theme — the "create a theme
+    /// with this name?" front door. Returns the raw name and optional
+    /// `--from` base, or `nil` if this argv isn't that shape. macOS-only:
+    /// on Linux there's no visual editor, so orphan tokens fall through to
+    /// the async dispatcher's `unknown command` path instead.
+    static func bareCreateInvocation(_ argv: [String]) -> (name: String, from: String?)? {
+        #if !os(macOS)
+        return nil
+        #else
+        let stripped = argv.dropFirst().filter { $0 != "-v" && $0 != "--verbose" }
+        guard let first = stripped.first, !first.hasPrefix("-") else { return nil }
+        if commandKeywords.contains(first) { return nil }
+        // A known theme (alias / built-in / custom) is a normal apply, not a create.
+        let resolved = themeAliases[first] ?? first
+        if builtinThemeIDs.contains(resolved) || CustomThemes.shared.find(id: resolved) != nil {
+            return nil
+        }
+        // Only `--from <base>` may follow the name; anything else means this
+        // isn't the front door (let the async path report "unknown command").
+        var from: String?
+        let rest = Array(stripped.dropFirst())
+        var i = 0
+        while i < rest.count {
+            guard rest[i] == "--from", i + 1 < rest.count else { return nil }
+            from = rest[i + 1]
+            i += 2
+        }
+        return (name: first, from: from)
+        #endif
+    }
+
     /// `theme <id>` applies a theme. The `--edit` form is dispatched
     /// separately by `dispatchEditorSync` because the editor must run
     /// fully synchronously on the main thread (mixing
@@ -559,7 +613,7 @@ public enum Commands {
         // forked (mustRename); existing customs edit in place.
         guard let seed = Themes.byId(id) else {
             FileHandle.standardError.write(Data(
-                "no such theme '\(id)'. Try `gh-wallpaper themes new \(id)` to create one.\n".utf8
+                "no such theme '\(id)'. Try `gh-wallpaper \(id)` to create one.\n".utf8
             ))
             return 1
         }
@@ -567,16 +621,33 @@ public enum Commands {
         return runEditorSync(seed: seed, initialName: id, mustRename: isBuiltin)
     }
 
+    /// Shared implementation behind the `gh-wallpaper <name>` create front
+    /// door: validates the name, resolves a seed (explicit `--from <base>`,
+    /// else current theme, else github-dark), and opens the editor.
     private static func runThemesNewSync(args: [String]) -> Int32 {
         var name: String? = nil
-        for a in args {
-            if name == nil { name = a; continue }
-            FileHandle.standardError.write(Data("unexpected argument: \(a)\n".utf8))
-            return 1
+        var from: String? = nil
+        var i = 0
+        while i < args.count {
+            let a = args[i]
+            if a == "--from" {
+                guard i + 1 < args.count else {
+                    FileHandle.standardError.write(Data("--from needs a theme id\n".utf8))
+                    return 1
+                }
+                from = args[i + 1]
+                i += 2
+            } else if name == nil {
+                name = a
+                i += 1
+            } else {
+                FileHandle.standardError.write(Data("unexpected argument: \(a)\n".utf8))
+                return 1
+            }
         }
         guard let n = name, !n.isEmpty else {
             FileHandle.standardError.write(Data(
-                "usage: gh-wallpaper themes new <name>\n".utf8
+                "usage: gh-wallpaper <name> [--from <base-theme>]\n".utf8
             ))
             return 1
         }
@@ -593,16 +664,85 @@ public enum Commands {
             return 1
         }
 
-        // Seed: current config theme if any, else github-dark. Users
-        // re-seed live from the editor's "Apply defaults from…" menu.
+        // Seed priority: explicit `--from <base>`, then the current config
+        // theme, then github-dark. Either way users can re-seed live from the
+        // editor's "Apply defaults from…" menu.
         let seed: Theme
-        if let cfg = try? ConfigStore.read() {
+        if let from = from {
+            guard let base = Themes.byId(from) else {
+                FileHandle.standardError.write(Data(
+                    "no such base theme '\(from)' for --from (run `gh-wallpaper themes` to list available themes)\n".utf8
+                ))
+                return 1
+            }
+            seed = base
+        } else if let cfg = try? ConfigStore.read() {
             seed = cfg.resolvedTheme()
         } else {
             seed = Themes.githubDark
         }
 
         return runEditorSync(seed: seed, initialName: n, mustRename: false)
+    }
+
+    /// The bare `gh-wallpaper <unknown-name>` front door. Confirms intent
+    /// interactively, then hands off to `runThemesNewSync`. Non-interactive
+    /// callers (pipes, CI) keep the old `unknown command` behavior so scripts
+    /// never hang on a prompt or get surprised by an editor window.
+    private static func runBareCreateSync(name: String, from: String?) -> Int32 {
+        guard isatty(FileHandle.standardInput.fileDescriptor) != 0 else {
+            FileHandle.standardError.write(Data(
+                "unknown command: \(name)\nRun `gh-wallpaper --help` for usage.\n".utf8
+            ))
+            return 1
+        }
+        // Typo guard: if the name is a near-miss of a real theme, surface it
+        // first so a mistyped `dracula` doesn't silently offer theme creation.
+        if let suggestion = closestThemeSuggestion(for: name) {
+            print("No theme named '\(name)'. Did you mean '\(suggestion)'?  (apply it with `gh-wallpaper \(suggestion)`)")
+        }
+        let fromNote = from.map { " from '\($0)'" } ?? ""
+        print("Create a custom theme called '\(name)'\(fromNote)? [y/N] ", terminator: "")
+        guard let line = readLine(), line.trimmingCharacters(in: .whitespaces).lowercased().hasPrefix("y") else {
+            print("(nothing created)")
+            return 0
+        }
+        var newArgs = [name]
+        if let from = from { newArgs += ["--from", from] }
+        return runThemesNewSync(args: newArgs)
+    }
+
+    /// Nearest known theme id/alias to `name` within a small edit distance,
+    /// or nil if nothing is close. Used only to nudge on likely typos.
+    private static func closestThemeSuggestion(for name: String) -> String? {
+        let target = name.lowercased()
+        var candidates = Themes.builtins.map(\.id) + Array(themeAliases.keys) + ["auto"]
+        candidates += CustomThemes.shared.all().map(\.id)
+        var best: (id: String, dist: Int)?
+        for c in candidates where c != target {
+            let d = levenshtein(target, c.lowercased())
+            if d <= 2, best == nil || d < best!.dist {
+                best = (c, d)
+            }
+        }
+        return best?.id
+    }
+
+    private static func levenshtein(_ a: String, _ b: String) -> Int {
+        let s = Array(a), t = Array(b)
+        if s.isEmpty { return t.count }
+        if t.isEmpty { return s.count }
+        var prev = Array(0...t.count)
+        var curr = [Int](repeating: 0, count: t.count + 1)
+        for i in 1...s.count {
+            curr[0] = i
+            for j in 1...t.count {
+                let cost = s[i - 1] == t[j - 1] ? 0 : 1
+                curr[j] = min(prev[j] + 1, curr[j - 1] + 1, prev[j - 1] + cost)
+            }
+            swap(&prev, &curr)
+        }
+        return prev[t.count]
     }
 
     /// Synchronous twin of the deleted async `runEditor`. Opens the SwiftUI
@@ -662,9 +802,10 @@ public enum Commands {
 
     /// `themes` (no verb) lists built-in + custom themes.
     /// `themes <verb>` dispatches to CRUD actions: delete / export / import.
-    /// (`themes new` is handled by `dispatchEditorSync` on macOS — see
-    /// `runTheme` for why. On Linux, "new" lands here and we point users at
-    /// the export-edit-reimport JSON workflow.)
+    /// Creating a theme is now the bare `gh-wallpaper <name>` front door (see
+    /// `bareCreateInvocation`); `themes new` survives only as a redirect on
+    /// macOS and, on Linux, as a pointer to the export-edit-reimport JSON
+    /// workflow (Linux has no visual editor).
     private static func runThemes(args: [String]) async -> Int32 {
         guard let verb = args.first else { return runThemesList() }
         let rest = Array(args.dropFirst())
@@ -674,9 +815,10 @@ public enum Commands {
         case "import":  return runThemesImport()
         case "new":
             #if os(macOS)
-            // On macOS this is normally caught by isEditorInvocation upstream.
+            // Removed in favor of the shorter front door. Point the way.
+            let target = rest.first ?? "<name>"
             FileHandle.standardError.write(Data(
-                "internal: themes new should have been routed to the editor\n".utf8
+                "`themes new` has been replaced. Create a custom theme with:\n  gh-wallpaper \(target)\n  gh-wallpaper \(target) --from <base-theme>\n".utf8
             ))
             return 1
             #else
@@ -687,7 +829,7 @@ public enum Commands {
             #endif
         default:
             FileHandle.standardError.write(Data(
-                "unknown verb: \(verb)\nusage: gh-wallpaper themes [new|delete|export|import] [...]\n".utf8
+                "unknown verb: \(verb)\nusage: gh-wallpaper themes [delete|export|import] [...]\n".utf8
             ))
             return 1
         }
@@ -714,7 +856,7 @@ public enum Commands {
             print("""
 
             Custom themes: none.
-              Create one with `gh-wallpaper themes new <name>` (visual editor),
+              Create one with `gh-wallpaper <name>` (visual editor),
               or fork a built-in with `gh-wallpaper theme <id> --edit`.
             """)
         } else {
@@ -1111,13 +1253,14 @@ public enum Commands {
                                                dark · light · dracula · midnight · nord · paper
                                                ocean · blossom · tokyo-night · gruvbox-dark
                                                catppuccin-frappe · catppuccin-mocha · auto
+                                               An unknown name offers to create a custom theme.
+          gh-wallpaper <name> --from <base>    Create custom theme <name> seeded from <base>
           gh-wallpaper theme                   Show current theme + list all available
           gh-wallpaper theme <id>              Apply a theme (built-in or custom)
           gh-wallpaper theme <id> --edit       Open the editor seeded from <id>
                                                Built-ins fork on save (must rename);
                                                customs edit in place.
           gh-wallpaper themes                  List built-in + custom themes
-          gh-wallpaper themes new <name>       Create a new custom theme in the editor
           gh-wallpaper themes delete <name>    Remove a custom theme + its image
           gh-wallpaper themes export <name>    Print theme JSON to stdout (works for built-ins)
           gh-wallpaper themes import           Read theme JSON from stdin and save it
