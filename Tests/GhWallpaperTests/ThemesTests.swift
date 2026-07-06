@@ -77,6 +77,50 @@ final class ThemesTests: XCTestCase {
         XCTAssertEqual(resolved?.cellRamp.count, 5)
     }
 
+    /// Regression: the daemon is long-lived and CustomThemes caches for the
+    /// process lifetime, so it re-scans on every refresh via `reload()`. This
+    /// guards the contract that a `reload()` surfaces on-disk edits (an edited
+    /// custom theme's new colors) and creations (a newly-added file). Without
+    /// the daemon's per-tick reload, an edited custom theme kept rendering its
+    /// stale startup colors and a new one fell back to github-dark.
+    func testReloadPicksUpEditsAndCreations() throws {
+        let tmp = try makeTempThemesDir()
+        defer { try? FileManager.default.removeItem(at: tmp) }
+
+        CustomThemes.shared.directoryOverride = tmp
+        CustomThemes.shared.reload()
+        defer {
+            CustomThemes.shared.directoryOverride = nil
+            CustomThemes.shared.reload()
+        }
+
+        let file = tmp.appendingPathComponent("blue.json")
+        func writeTheme(headline: String) throws {
+            try """
+            {
+              "id": "blue",
+              "background": "#112233",
+              "backgroundIsGradient": false,
+              "cellRamp": ["#000000", "#333333", "#666666", "#999999", "#ffffff"],
+              "headlineColor": "\(headline)"
+            }
+            """.write(to: file, atomically: true, encoding: .utf8)
+        }
+
+        // Starts absent: a cached empty scan must not mask a later creation.
+        XCTAssertNil(Themes.byId("blue"))
+
+        // Creation surfaces after reload (daemon's per-tick behavior).
+        try writeTheme(headline: "#ff00ff")
+        CustomThemes.shared.reload()
+        XCTAssertEqual(Themes.byId("blue")?.headlineColor, "#ff00ff")
+
+        // Edit surfaces after reload — the actual "resets back to old colors" bug.
+        try writeTheme(headline: "#00ffff")
+        CustomThemes.shared.reload()
+        XCTAssertEqual(Themes.byId("blue")?.headlineColor, "#00ffff")
+    }
+
     func testCustomThemeWithBadHexIsRejected() throws {
         let tmp = try makeTempThemesDir()
         defer { try? FileManager.default.removeItem(at: tmp) }

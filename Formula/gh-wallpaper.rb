@@ -1,8 +1,8 @@
 class GhWallpaper < Formula
   desc "GitHub contribution heatmap as your macOS desktop wallpaper"
   homepage "https://github.com/Numbatt/github-heatmap-wallpaper"
-  url "https://github.com/Numbatt/github-heatmap-wallpaper/archive/refs/tags/v0.2.5.tar.gz"
-  version "0.2.5"
+  url "https://github.com/Numbatt/github-heatmap-wallpaper/archive/refs/tags/v0.2.6.tar.gz"
+  version "0.2.6"
   sha256 "45bc28df2049b9f10a0a839a8824eacfe3039c9ca5d32eadfe96f4e5ed605bd5"
   license "MIT"
 

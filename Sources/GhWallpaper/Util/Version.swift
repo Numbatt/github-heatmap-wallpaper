@@ -1,11 +1,16 @@
 import Foundation
 
 /// The version string for this binary. Update this on every release.
-public let CurrentVersion = "0.2.5"
+public let CurrentVersion = "0.2.6"
 
 /// Brief "what's new" notes per released version. Shown once on first daemon
 /// tick after an upgrade, and via `gh-wallpaper version`.
 private let changelog: [String: String] = [
+    "0.2.6": """
+        • Fixed custom themes reverting a couple minutes after you edited them:
+          the background daemon now re-reads your custom theme files on every
+          refresh, so edits (and newly-created themes) apply without a restart
+        """,
     "0.2.5": """
         • Fixed a wallpaper-cache leak: gh-wallpaper no longer floods macOS's
           "Your Photos" picker with a new copy on every refresh (that could

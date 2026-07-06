@@ -189,6 +189,14 @@ public actor Daemon {
             failureTracker.recordFailure()
             return
         }
+
+        // Re-scan custom themes from disk so edits/creations propagate without a
+        // daemon restart, mirroring the config reload above. CustomThemes.shared
+        // caches for the process lifetime; the daemon is long-lived, so without
+        // this an edited custom theme keeps rendering its stale startup colors
+        // (and a newly-created one silently falls back to github-dark).
+        CustomThemes.shared.reload()
+
         let (theme, effectiveHeadline) = resolveRotation(userConfig: userConfig)
 
         // 1. Enumerate connected displays, then filter by `displays` mode.
