@@ -1189,24 +1189,30 @@ public enum Commands {
             let rasterizer = try Rasterizer()
             let setter = WallpaperSetter()
             let builder = SVGBuilder()
+            var liveNames: [String] = []
             for display in displays {
                 let canvas = SVGBuilder.Canvas(widthPx: display.widthPx, heightPx: display.heightPx)
                 let svg = builder.build(calendar: calendar, theme: theme, canvas: canvas, headline: headline)
 
-                // Write to a uniquely-suffixed path so macOS treats every render
-                // as a new image. Without this, NSWorkspace.setDesktopImageURL
-                // with the same path silently no-ops (the OS caches by path).
-                let suffix = String(Int(Date().timeIntervalSince1970 * 1000))
-                let png = Paths.wallpaperPNG(displayUUID: "\(display.uuid)-\(suffix)")
+                // Ping-pong between two stable slots per display so macOS treats
+                // each set as a new image (it caches by path) without growing its
+                // "Your Photos" wallpaper history unbounded. See
+                // WallpaperSetter.nextWallpaperName.
+                let liveName = setter.nextWallpaperName(for: display)
+                let png = Paths.supportDir.appendingPathComponent(liveName)
+                liveNames.append(liveName)
                 try rasterizer.rasterize(svg: svg, toPNG: png, widthPx: display.widthPx, heightPx: display.heightPx)
                 print("→ rendered \(png.lastPathComponent) (\(display.widthPx)×\(display.heightPx))")
                 if setWallpaper {
                     try setter.set(pngURL: png, on: display)
                 }
+            }
 
-                // Clean up older PNGs for this display so we don't accumulate
-                // disk garbage across thousands of refreshes.
-                cleanupOldWallpapers(displayUUID: display.uuid, keep: png)
+            // Prune stale wallpapers only when we actually set one — a dry
+            // `render` must not delete the slot file the daemon currently has on
+            // the desktop.
+            if setWallpaper {
+                cleanupOldWallpapers(keep: Set(liveNames))
             }
             if setWallpaper { print("done.") }
             return 0
@@ -1216,24 +1222,19 @@ public enum Commands {
         }
     }
 
-    /// Deletes wallpaper-<UUID>-*.png files for the given display except `keep`.
-    /// Best-effort: ignores errors. Called after every render.
-    private static func cleanupOldWallpapers(displayUUID: String, keep: URL) {
+    /// Deletes every `wallpaper-*` file in the support dir except the live frames
+    /// just written (`keep`) — the opposite ping-pong slot, legacy timestamped
+    /// PNGs, and stale-display files. Best-effort: ignores errors.
+    private static func cleanupOldWallpapers(keep: Set<String>) {
         let fm = FileManager.default
         guard let entries = try? fm.contentsOfDirectory(at: Paths.supportDir, includingPropertiesForKeys: nil) else {
             return
         }
-        let prefix = "wallpaper-\(displayUUID)-"
-        for entry in entries where entry != keep {
-            if entry.lastPathComponent.hasPrefix(prefix) && entry.pathExtension == "png" {
-                try? fm.removeItem(at: entry)
-            }
-        }
-        // Also clean up the legacy non-suffixed file if it exists
-        // (from before we added cache-busting).
-        let legacy = Paths.supportDir.appendingPathComponent("wallpaper-\(displayUUID).png")
-        if FileManager.default.fileExists(atPath: legacy.path) && legacy != keep {
-            try? fm.removeItem(at: legacy)
+        for entry in entries {
+            let name = entry.lastPathComponent
+            guard name.hasPrefix("wallpaper-") else { continue }
+            if keep.contains(name) { continue }
+            try? fm.removeItem(at: entry)
         }
     }
     #endif  // os(macOS) — runUninstall + renderOneShot + cleanupOldWallpapers

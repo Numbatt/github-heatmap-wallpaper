@@ -1,11 +1,18 @@
 import Foundation
 
 /// The version string for this binary. Update this on every release.
-public let CurrentVersion = "0.2.4"
+public let CurrentVersion = "0.2.5"
 
 /// Brief "what's new" notes per released version. Shown once on first daemon
 /// tick after an upgrade, and via `gh-wallpaper version`.
 private let changelog: [String: String] = [
+    "0.2.5": """
+        • Fixed a wallpaper-cache leak: gh-wallpaper no longer floods macOS's
+          "Your Photos" picker with a new copy on every refresh (that could
+          pile up to ~1 GB of orphaned thumbnails over months)
+        • Renders now ping-pong between two stable image slots per display
+          instead of writing a uniquely-named file each tick
+        """,
     "0.2.4": """
         • Create a theme by just typing its name — gh-wallpaper my-theme
           offers to create it and opens the editor (no more `themes new`)

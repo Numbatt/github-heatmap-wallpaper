@@ -2,6 +2,11 @@
 
 All notable changes to `gh-wallpaper` are recorded here. The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project follows semver.
 
+## [0.2.5] — 2026-07-05
+
+### Fixed
+- **Runaway wallpaper cache.** Every refresh wrote a uniquely-named PNG and handed macOS a brand-new path, which macOS's image-wallpaper extension cached a full copy of — forever — and listed under the Wallpaper picker's "Your Photos". Over months this grew without bound (hundreds of near-identical thumbnails, up to ~1 GB of orphaned cache). Renders now **ping-pong between two stable image slots per display** (`-a` / `-b`): macOS still sees a path change each tick (so the set isn't a silent no-op — it caches the desktop image by path), but the history caps at two entries per display instead of growing forever. Applied consistently across the daemon, the setup wizard, and the `refresh` / theme-apply paths, and the on-disk cleanup now prunes every stale wallpaper file rather than only those matching a currently-connected display.
+
 ## [0.2.4] — 2026-07-05
 
 ### Changed

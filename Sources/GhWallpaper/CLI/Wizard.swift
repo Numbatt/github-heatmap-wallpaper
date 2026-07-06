@@ -144,8 +144,7 @@ public struct Wizard {
         for display in targetDisplays {
             let canvas = SVGBuilder.Canvas(widthPx: display.widthPx, heightPx: display.heightPx)
             let svg = builder.build(calendar: calendar, theme: theme, canvas: canvas)
-            let suffix = String(Int(Date().timeIntervalSince1970 * 1000))
-            let png = Paths.supportDir.appendingPathComponent("wallpaper-\(display.uuid)-\(suffix).png")
+            let png = Paths.supportDir.appendingPathComponent(setter.nextWallpaperName(for: display))
             try rasterizer.rasterize(svg: svg, toPNG: png, widthPx: display.widthPx, heightPx: display.heightPx)
             try setter.set(pngURL: png, on: display)
             print("  wallpaper set on \(display.uuid)")

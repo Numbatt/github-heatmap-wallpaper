@@ -246,15 +246,22 @@ public actor Daemon {
         }
 
         var perDisplayFailed = false
-        // Timestamp suffix forces NSWorkspace.setDesktopImageURL to treat each
-        // render as a new file (macOS caches by path; same path, new content =
-        // silent no-op). Old PNGs for this display are cleaned up after success.
-        let stamp = String(Int(Date().timeIntervalSince1970 * 1000))
+        // macOS caches the desktop image by *path*: re-setting the same path with
+        // new content is a silent no-op, so each render must land on a path that
+        // differs from the one currently set. We ping-pong between two stable
+        // slots per display ("-a" / "-b") rather than a unique timestamp per tick.
+        // The old timestamp scheme fed macOS a brand-new path on every refresh,
+        // and macOS's image-wallpaper extension cached a full copy of each under
+        // "Your Photos" forever (hundreds of orphaned thumbnails, ~1 GB over
+        // months). Two slots cap that at two entries per display.
+        var liveNames: [String] = []
         for display in displays {
             let canvas = SVGBuilder.Canvas(widthPx: display.widthPx, heightPx: display.heightPx)
             let svg = svgBuilder.build(calendar: calendar, theme: theme, canvas: canvas, headline: effectiveHeadline)
-            let livePNG = outputDir.appendingPathComponent("wallpaper-\(display.uuid)-\(stamp).png")
-            let tempPNG = outputDir.appendingPathComponent("wallpaper-\(display.uuid)-\(stamp).new.png")
+            let liveName = wallpaperSetter.nextWallpaperName(for: display)
+            liveNames.append(liveName)
+            let livePNG = outputDir.appendingPathComponent(liveName)
+            let tempPNG = outputDir.appendingPathComponent(liveName + ".new")
 
             // Rasterize to temp file (atomic promotion preserves last-good on failure).
             do {
@@ -300,9 +307,10 @@ public actor Daemon {
             return
         }
 
-        // Clean up older wallpaper PNGs for these displays so we don't accumulate
-        // disk garbage across thousands of refresh ticks.
-        cleanupOldWallpapers(in: outputDir, displays: displays, currentStamp: stamp)
+        // Clean up every other wallpaper file so we don't accumulate disk garbage:
+        // the opposite ping-pong slot, legacy timestamped PNGs, stale-display
+        // files, orphaned temps, and old SVG dumps.
+        cleanupOldWallpapers(in: outputDir, keep: Set(liveNames))
 
         lastRenderHash = hash
         failureTracker.recordSuccess()
@@ -367,22 +375,18 @@ public actor Daemon {
 
     /// Deletes `wallpaper-<UUID>-*.png` for each display except the file with
     /// `currentStamp`. Best-effort: errors are ignored (will retry next tick).
-    private func cleanupOldWallpapers(in dir: URL, displays: [DisplayInfo], currentStamp: String) {
+    /// Removes every `wallpaper-*` file in `dir` except the live frames just
+    /// written (`keep`). Catches the opposite ping-pong slot, legacy timestamped
+    /// PNGs, stale-display files, orphaned `.new` temps, and old `.svg` dumps.
+    private func cleanupOldWallpapers(in dir: URL, keep: Set<String>) {
         guard let entries = try? FileManager.default.contentsOfDirectory(
             at: dir, includingPropertiesForKeys: nil
         ) else { return }
-        let activeUUIDs = Set(displays.map { $0.uuid })
         for entry in entries {
             let name = entry.lastPathComponent
-            guard name.hasPrefix("wallpaper-"), name.hasSuffix(".png") else { continue }
-            // Match wallpaper-<UUID>(-<stamp>)?.png — keep current stamp; drop everything else.
-            let body = String(name.dropFirst("wallpaper-".count).dropLast(".png".count))
-            // Body looks like "<UUID>-<stamp>" or "<UUID>" (legacy) or "<UUID>-<stamp>.new"
-            if body.contains("-\(currentStamp)") { continue }
-            // Sanity: only delete if it starts with one of our active display UUIDs
-            if activeUUIDs.contains(where: { body.hasPrefix($0) }) {
-                try? FileManager.default.removeItem(at: entry)
-            }
+            guard name.hasPrefix("wallpaper-") else { continue }
+            if keep.contains(name) { continue }
+            try? FileManager.default.removeItem(at: entry)
         }
     }
 
