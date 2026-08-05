@@ -1,6 +1,6 @@
 # Install stats
 
-> *Auto-generated from `docs/install-stats.ndjson`. Last snapshot: **2026-08-04T06:05:33Z**. Do not hand-edit — re-run `script/install-stats.sh` to regenerate.*
+> *Auto-generated from `docs/install-stats.ndjson`. Last snapshot: **2026-08-05T06:02:19Z**. Do not hand-edit — re-run `script/install-stats.sh` to regenerate.*
 
 ## Install signals
 
@@ -44,4 +44,4 @@ Data source is GitHub's own public releases API for *this repo*. Snapshotting th
 
 ## History
 
-Each daily snapshot is one line in [`install-stats.ndjson`](install-stats.ndjson). The file is append-only (deduped by date so re-running the script on the same day overwrites that day's row). Total snapshots so far: **92**.
+Each daily snapshot is one line in [`install-stats.ndjson`](install-stats.ndjson). The file is append-only (deduped by date so re-running the script on the same day overwrites that day's row). Total snapshots so far: **93**.
