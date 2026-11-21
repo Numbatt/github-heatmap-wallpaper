@@ -1,13 +1,13 @@
 # Install stats
 
-> *Auto-generated from `docs/install-stats.ndjson`. Last snapshot: **2026-11-20T11:48:41Z**. Do not hand-edit — re-run `script/install-stats.sh` to regenerate.*
+> *Auto-generated from `docs/install-stats.ndjson`. Last snapshot: **2026-11-21T11:15:15Z**. Do not hand-edit — re-run `script/install-stats.sh` to regenerate.*
 
 ## Install signals
 
 | Metric | Value | What it counts |
 |---|---:|---|
-| **Installs of latest release** (`v0.2.6`) | **25** | Bottles pulled for the newest tag. The most honest install number we have. |
-| All-time install events | 113 | Sum of every bottle download across every release. **Inflated by `brew upgrade` churn — not a user count.** |
+| **Installs of latest release** (`v0.2.6`) | **26** | Bottles pulled for the newest tag. The most honest install number we have. |
+| All-time install events | 123 | Sum of every bottle download across every release. **Inflated by `brew upgrade` churn — not a user count.** |
 
 ## What is one "install"?
 
@@ -19,16 +19,16 @@ This is why the headline figure is "installs of the latest release" rather than 
 
 | Tag | Bottle downloads (cumulative, all platforms) |
 |---|---:|
-| `v0.2.6` | 25 |
+| `v0.2.6` | 26 |
 | `v0.2.5` | 4 |
 | `v0.2.4` | 4 |
 | `v0.2.3` | 4 |
 | `v0.2.2` | 7 |
 | `v0.2.1` | 4 |
-| `v0.2.0` | 13 |
+| `v0.2.0` | 16 |
 | `v0.1.3` | 9 |
-| `v0.1.2.1` | 16 |
-| `v0.1.2` | 13 |
+| `v0.1.2.1` | 19 |
+| `v0.1.2` | 16 |
 | `v0.1.1` | 13 |
 | `v0.1.0` | 1 |
 
@@ -44,4 +44,4 @@ Data source is GitHub's own public releases API for *this repo*. Snapshotting th
 
 ## History
 
-Each daily snapshot is one line in [`install-stats.ndjson`](install-stats.ndjson). The file is append-only (deduped by date so re-running the script on the same day overwrites that day's row). Total snapshots so far: **200**.
+Each daily snapshot is one line in [`install-stats.ndjson`](install-stats.ndjson). The file is append-only (deduped by date so re-running the script on the same day overwrites that day's row). Total snapshots so far: **201**.
